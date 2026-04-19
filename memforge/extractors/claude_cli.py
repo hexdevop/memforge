@@ -157,16 +157,20 @@ class ClaudeCliExtractor:
 
     def _parse_response(self, raw: str) -> list[ExtractedUnit]:
         # --output-format json wraps the model text in {"type":"result","result":"<string>",...}
-        # Unwrap the envelope first, then parse the inner string as JSON.
+        # When --json-schema is used, structured data lands in "structured_output", not "result".
         try:
             outer = json.loads(raw)
-            if isinstance(outer, dict) and "result" in outer:
+            if isinstance(outer, dict):
                 if outer.get("is_error"):
                     log.error("claude CLI reported error: %s", str(outer.get("result", ""))[:200])
                     return []
-                inner = outer["result"]
-                # result is always a string in the CLI envelope
-                raw = inner if isinstance(inner, str) else json.dumps(inner)
+                # Prefer structured_output (set when --json-schema is used)
+                if "structured_output" in outer and outer["structured_output"]:
+                    so = outer["structured_output"]
+                    raw = so if isinstance(so, str) else json.dumps(so)
+                elif "result" in outer:
+                    inner = outer["result"]
+                    raw = inner if isinstance(inner, str) else json.dumps(inner)
         except json.JSONDecodeError:
             pass
 

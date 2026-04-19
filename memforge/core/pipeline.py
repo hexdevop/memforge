@@ -22,6 +22,7 @@ class SaveResult:
     transcript_hash: str
     quarantined: int
     backend_used: str = "unknown"
+    units_extracted: int = 0
 
 
 def _select_extractor(cfg: Config) -> tuple[ClaudeCliExtractor | ClaudeExtractor, str]:
@@ -93,6 +94,7 @@ async def run_save(
             transcript_hash=transcript_hash,
             quarantined=0,
             backend_used=backend,
+            units_extracted=0,
         )
 
     drafts: list[Draft] = []
@@ -132,4 +134,5 @@ async def run_save(
         transcript_hash=transcript_hash,
         quarantined=quarantined,
         backend_used=backend,
+        units_extracted=len(units),
     )

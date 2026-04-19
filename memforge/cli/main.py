@@ -134,11 +134,9 @@ def save(
     console.print(f"[dim]Backend: {result.backend_used}[/]")
 
     if dry_run:
-        msg = (
-            f"[yellow]dry-run:[/] would create {len(result.drafts) or '?'} draft(s). "
-            "Nothing written."
+        console.print(
+            f"[yellow]dry-run:[/] would create {result.units_extracted} draft(s). Nothing written."
         )
-        console.print(msg)
         return
 
     if not result.drafts:
@@ -242,8 +240,7 @@ def scan(
 
     if dry_run:
         console.print(
-            f"[yellow]dry-run:[/] would create {len(result.drafts) or '?'} draft(s)."
-            f" Nothing written."
+            f"[yellow]dry-run:[/] would create {result.units_extracted} draft(s). Nothing written."
         )
         return
 
