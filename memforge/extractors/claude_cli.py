@@ -87,6 +87,9 @@ class ClaudeCliExtractor:
         cmd = [
             "claude",
             "--print",
+            "--bare",
+            "--tools",
+            "",
             "--output-format",
             "json",
             "--json-schema",
@@ -122,6 +125,21 @@ class ClaudeCliExtractor:
         self._log_call(log_dir, latency_ms, len(units))
         return units
 
+    @staticmethod
+    def _compress_transcript(transcript: Transcript) -> str:
+        """Return only the conversational turns, skipping tool output noise."""
+        parts: list[str] = []
+        for m in transcript.messages:
+            text = m.content.strip()
+            if not text:
+                continue
+            # Heuristic: tool_result blocks are typically long; skip them to save tokens.
+            # Real user/assistant turns rarely exceed 2 000 chars each.
+            if len(text) > 2_000:
+                text = text[:500] + "\n…[truncated]"
+            parts.append(f"[{m.role.upper()}]\n{text}")
+        return "\n\n".join(parts)
+
     def _build_user_message(
         self,
         transcript: Transcript,
@@ -137,59 +155,49 @@ class ClaudeCliExtractor:
         parts.append(f"Language for output: {self._language}")
         parts.append("")
         parts.append("=== TRANSCRIPT ===")
-        parts.append(transcript.text[:40_000])
+        parts.append(self._compress_transcript(transcript)[:20_000])
         return "\n".join(parts)
 
     def _parse_response(self, raw: str) -> list[ExtractedUnit]:
-        # --output-format json wraps in {"type":"result","result":..., "subtype":"..."}
+        # --output-format json wraps the model text in {"type":"result","result":"<string>",...}
+        # Unwrap the envelope first, then parse the inner string as JSON.
         try:
             outer = json.loads(raw)
-            # Unwrap claude CLI json envelope
-            if isinstance(outer, dict):
-                if "result" in outer:
-                    data = outer["result"]
-                elif "units" in outer:
-                    data = outer
-                else:
-                    # Try finding units anywhere
-                    data = outer
-            else:
-                data = outer
+            if isinstance(outer, dict) and "result" in outer:
+                if outer.get("is_error"):
+                    log.error("claude CLI reported error: %s", str(outer.get("result", ""))[:200])
+                    return []
+                inner = outer["result"]
+                # result is always a string in the CLI envelope
+                raw = inner if isinstance(inner, str) else json.dumps(inner)
         except json.JSONDecodeError:
-            # Fallback: find JSON array or object embedded in surrounding text.
-            array_start = raw.find("[")
-            object_start = raw.find("{")
+            pass
 
-            candidates: list[tuple[int, int]] = []
-            if array_start != -1:
-                candidates.append((array_start, raw.rfind("]") + 1))
-            if object_start != -1:
-                candidates.append((object_start, raw.rfind("}") + 1))
+        # Now parse the model's actual output
+        def _extract_list(text: str) -> list | None:
+            try:
+                parsed = json.loads(text)
+                return parsed if isinstance(parsed, list) else (
+                    parsed.get("units") or next(
+                        (v for v in parsed.values() if isinstance(v, list)), None
+                    ) if isinstance(parsed, dict) else None
+                )
+            except json.JSONDecodeError:
+                return None
 
-            for start, end in sorted(candidates, key=lambda item: item[0]):
-                if end <= start:
-                    continue
-                try:
-                    data = json.loads(raw[start:end])
-                    break
-                except json.JSONDecodeError:
-                    continue
-            else:
-                log.warning("ClaudeCliExtractor: JSON parse failed")
-                return []
-
-        # data may be {"units": [...]} or directly a list
-        raw_list = []
-        if isinstance(data, dict):
-            raw_list = data.get("units", [])
-            if not raw_list:
-                # Maybe the model returned a bare list inside result
-                for v in data.values():
-                    if isinstance(v, list):
-                        raw_list = v
+        raw_list = _extract_list(raw)
+        if raw_list is None:
+            # Fallback: find the first JSON array or object embedded in surrounding text
+            for start_char, end_char in (("[", "]"), ("{", "}")):
+                start = raw.find(start_char)
+                end = raw.rfind(end_char) + 1
+                if start != -1 and end > start:
+                    raw_list = _extract_list(raw[start:end])
+                    if raw_list is not None:
                         break
-        elif isinstance(data, list):
-            raw_list = data
+        if raw_list is None:
+            log.warning("ClaudeCliExtractor: could not parse JSON from response")
+            return []
 
         units: list[ExtractedUnit] = []
         valid_types = {"decision", "pattern", "gotcha", "contract", "glossary", "todo"}
