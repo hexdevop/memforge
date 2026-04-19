@@ -87,9 +87,6 @@ class ClaudeCliExtractor:
         cmd = [
             "claude",
             "--print",
-            "--bare",
-            "--tools",
-            "",
             "--output-format",
             "json",
             "--json-schema",
@@ -177,10 +174,15 @@ class ClaudeCliExtractor:
         def _extract_list(text: str) -> list | None:
             try:
                 parsed = json.loads(text)
-                return parsed if isinstance(parsed, list) else (
-                    parsed.get("units") or next(
-                        (v for v in parsed.values() if isinstance(v, list)), None
-                    ) if isinstance(parsed, dict) else None
+                return (
+                    parsed
+                    if isinstance(parsed, list)
+                    else (
+                        parsed.get("units")
+                        or next((v for v in parsed.values() if isinstance(v, list)), None)
+                        if isinstance(parsed, dict)
+                        else None
+                    )
                 )
             except json.JSONDecodeError:
                 return None

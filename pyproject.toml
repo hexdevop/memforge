@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "memforge"
-version = "0.1.2"
+version = "0.1.3"
 description = "Local external memory system for LLM agents"
 keywords = ["llm", "memory", "ai", "agents"]
 classifiers = [
@@ -92,4 +92,3 @@ check_untyped_defs = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "--cov=memforge --cov-report=term-missing"

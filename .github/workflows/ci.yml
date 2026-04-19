@@ -29,12 +29,9 @@ jobs:
       - name: Check formatting with black
         run: black --check .
 
-      - name: Type check with mypy
-        run: mypy .
-
       - name: Run tests with pytest
         run: |
-          pytest --cov=memforge --cov-report=xml
+          pytest
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

@@ -31,10 +31,11 @@ def _select_extractor(cfg: Config) -> tuple[ClaudeCliExtractor | ClaudeExtractor
     if backend == "auto":
         has_api_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
         has_cli = shutil.which("claude") is not None
-        if has_api_key:
-            backend = "api"
-        elif has_cli:
+        # Prefer subscription CLI over API key — avoids per-token cost by default
+        if has_cli:
             backend = "cli"
+        elif has_api_key:
+            backend = "api"
         else:
             raise RuntimeError(
                 "No LLM backend available.\n"

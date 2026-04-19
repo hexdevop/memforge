@@ -200,6 +200,68 @@ def _load_transcript(source: str, file: Path | None, cfg: Config) -> Transcript 
 
 
 # ---------------------------------------------------------------------------
+# mem scan
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def scan(
+    path: Annotated[
+        Path, typer.Option("--path", "-p", help="Project root to scan (default: cwd)")
+    ] = Path("."),
+    note: Annotated[
+        str | None, typer.Option("--note", help="Extra context for the extractor")
+    ] = None,
+    scope: Annotated[str, typer.Option("--scope", help="global|project|both")] = "both",
+    dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
+) -> None:
+    """Scan project files and extract architectural knowledge into inbox."""
+    from memforge.sources.project import ProjectScanner
+
+    cfg = _load_cfg(scope)
+    store = _primary_store(scope)
+
+    if not store.memory.exists():
+        console.print("[red]✗[/] Store not initialised. Run `mem init` first.")
+        raise typer.Exit(1)
+
+    root = path.resolve()
+    scanner = ProjectScanner(root)
+    if not scanner.detect():
+        console.print(f"[red]✗[/] Directory not found: {root}")
+        raise typer.Exit(1)
+
+    console.print(f"[dim]Scanning project at {root}…[/]")
+    transcript = scanner.latest_session()
+    console.print(f"[dim]Collected {len(transcript.messages)} context block(s)[/]")
+
+    result = asyncio.run(
+        run_save(transcript, store, cfg, note=note, hint_type=None, dry_run=dry_run)
+    )
+    console.print(f"[dim]Backend: {result.backend_used}[/]")
+
+    if dry_run:
+        console.print(
+            f"[yellow]dry-run:[/] would create {len(result.drafts) or '?'} draft(s)."
+            f" Nothing written."
+        )
+        return
+
+    if not result.drafts:
+        console.print("[yellow]⚠[/] No knowledge units extracted.")
+        return
+
+    console.print(f"\n[green]✓[/] Created {len(result.drafts)} draft(s) in inbox:\n")
+    for d in result.drafts:
+        tag = " [red](quarantined)[/]" if d.quarantine else ""
+        console.print(f"  • [bold]{d.unit.title}[/] ({d.unit.type}){tag}")
+        console.print(f"    id: {d.draft_id}")
+
+    if cfg.git.auto_commit:
+        store.git_commit(f"scan(inbox): {len(result.drafts)} draft(s) from {root.name}")
+
+
+# ---------------------------------------------------------------------------
 # mem review
 # ---------------------------------------------------------------------------
 
