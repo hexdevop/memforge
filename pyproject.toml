@@ -4,8 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "memforge"
-version = "0.1.0"
+version = "0.1.1"
 description = "Local external memory system for LLM agents"
+keywords = ["llm", "memory", "ai", "agents"]
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Ikigai", email = "abduraxmonislomov@gmail.com" }]
@@ -25,6 +31,11 @@ dependencies = [
     "gitpython>=3.1",
     "pyyaml>=6.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/hexdevop/memforge"
+Repository = "https://github.com/hexdevop/memforge"
+Issues = "https://github.com/hexdevop/memforge/issues"
 
 [project.optional-dependencies]
 optional = ["detect-secrets>=1.5", "pyperclip>=1.8"]
@@ -62,6 +73,11 @@ target-version = ["py311"]
 python_version = "3.11"
 strict = true
 ignore_missing_imports = true
+exclude = [
+    "build/",
+    "dist/",
+    ".venv/",
+]
 
 [[tool.mypy.overrides]]
 module = ["yaml.*", "frontmatter.*", "markdown_it.*", "rank_bm25.*", "git.*"]

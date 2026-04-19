@@ -9,6 +9,8 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
+from anthropic import Anthropic
+
 from memforge.core.models import Article, ArticleFrontMatter, RecordType
 from memforge.core.storage import Store, slugify
 
@@ -20,7 +22,7 @@ def _load_prompt(version: str) -> str:
     return p.read_text("utf-8") if p.exists() else ""
 
 
-def _call_api(client, model: str, system: str, prompt: str, log_dir: Path | None) -> str:
+def _call_api(client: Anthropic, model: str, system: str, prompt: str, log_dir: Path | None) -> str:
     """Call Anthropic API directly."""
     from memforge.core.llm_log import record_call
 
@@ -199,6 +201,8 @@ class Compiler:
 
         try:
             if self._backend == "api":
+                if self._client is None:
+                    raise RuntimeError("Anthropic client is not initialized")
                 merged_body = _call_api(self._client, self._model, self._system, prompt, log_dir)
             else:
                 merged_body = _call_cli(self._system, prompt, log_dir)
@@ -222,7 +226,7 @@ class Compiler:
     ) -> Article | None:
         first = entries[0]
         combined_body = "\n\n".join(e.get("body", "") for e in entries)
-        record_type: RecordType = first.get("type", "pattern")  # type: ignore[assignment]
+        record_type: RecordType = first.get("type", "pattern")
         tags = first.get("tags", [])
         for e in entries[1:]:
             for t in e.get("tags", []):
@@ -235,7 +239,7 @@ class Compiler:
             title=first.get("title", slug),
             slug=slug,
             tags=tags,
-            confidence=first.get("confidence", "medium"),  # type: ignore[arg-type]
+            confidence=first.get("confidence", "medium"),
             source_agent=first.get("source_agent"),
             source_session_id=first.get("source_session_id"),
             fingerprint=_fingerprint(combined_body),

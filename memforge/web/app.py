@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
@@ -44,22 +45,25 @@ def create_app(token: str | None = None) -> FastAPI:
 
     # Optional token auth middleware
     if token:
+        from collections.abc import Callable
+        from typing import Any
+
         from fastapi import HTTPException
         from starlette.middleware.base import BaseHTTPMiddleware
-
-        from typing import Any, Callable
         from starlette.responses import Response
 
         class TokenMiddleware(BaseHTTPMiddleware):
-            async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
+            async def dispatch(
+                self, request: Request, call_next: Callable[[Request], Any]
+            ) -> Response:
                 if request.url.path.startswith("/static"):
-                    return await call_next(request)
+                    return cast(Response, await call_next(request))
                 if (
                     request.headers.get("X-Token") != token
                     and request.query_params.get("token") != token
                 ):
                     raise HTTPException(status_code=401, detail="Unauthorized")
-                return await call_next(request)
+                return cast(Response, await call_next(request))
 
         app.add_middleware(TokenMiddleware)
 

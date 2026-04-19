@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
@@ -78,7 +79,8 @@ logging:
 def _markdown_filter(text: str) -> str:
     from markdown_it import MarkdownIt
 
-    return MarkdownIt().render(text)
+    res = MarkdownIt().render(text)
+    return str(res)
 
 
 templates.env.filters["markdown"] = _markdown_filter
@@ -107,9 +109,9 @@ def _stores() -> list[Store]:
     return result
 
 
-def _tr(request: Request, name: str, ctx: dict) -> HTMLResponse:  # type: ignore[type-arg]
+def _tr(request: Request, name: str, ctx: dict[str, Any]) -> HTMLResponse:
     """Compat wrapper for Starlette 1.0 TemplateResponse (request-first API)."""
-    return templates.TemplateResponse(request, name, ctx)  # type: ignore[return-value]
+    return templates.TemplateResponse(request, name, ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -118,7 +120,7 @@ def _tr(request: Request, name: str, ctx: dict) -> HTMLResponse:  # type: ignore
 
 
 @router.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):
+async def dashboard(request: Request) -> HTMLResponse:
     stores = _stores()
     total_articles = 0
     total_drafts = 0
@@ -158,7 +160,7 @@ async def dashboard(request: Request):
 
 
 @router.get("/inbox", response_class=HTMLResponse)
-async def inbox(request: Request):
+async def inbox(request: Request) -> HTMLResponse:
     stores = _stores()
     drafts = []
     for store in stores:
@@ -179,7 +181,7 @@ async def knowledge(
     q: str = "",
     type_filter: str = "",
     tag: str = "",
-):
+) -> HTMLResponse:
     stores = _stores()
     articles = []
     all_tags: set[str] = set()
@@ -241,7 +243,7 @@ async def knowledge(
 
 
 @router.get("/knowledge/{slug}", response_class=HTMLResponse)
-async def article_view(request: Request, slug: str):
+async def article_view(request: Request, slug: str) -> HTMLResponse:
     for store in _stores():
         article = store.find_article_by_slug(slug)
         if article:
@@ -266,7 +268,7 @@ async def article_view(request: Request, slug: str):
 
 
 @router.get("/daily", response_class=HTMLResponse)
-async def daily(request: Request):
+async def daily(request: Request) -> HTMLResponse:
     stores = _stores()
     days = []
     for store in stores:
@@ -282,10 +284,10 @@ async def daily(request: Request):
 
 
 @router.get("/stats", response_class=HTMLResponse)
-async def stats(request: Request):
+async def stats(request: Request) -> HTMLResponse:
     stores = _stores()
-    type_counts: Counter = Counter()
-    tag_counts: Counter = Counter()
+    type_counts: Counter[str] = Counter()
+    tag_counts: Counter[str] = Counter()
     total = 0
     total_drafts = 0
 
@@ -319,13 +321,13 @@ async def stats(request: Request):
 
 
 @router.get("/settings", response_class=HTMLResponse)
-async def settings_get(request: Request):
+async def settings_get(request: Request) -> HTMLResponse:
     configs = _collect_configs()
     return _tr(request, "settings.html", {"configs": configs, "saved": False, "errors": []})
 
 
 @router.post("/settings", response_class=HTMLResponse)
-async def settings_post(request: Request):
+async def settings_post(request: Request) -> HTMLResponse:
     import yaml
 
     form = await request.form()
@@ -345,7 +347,10 @@ async def settings_post(request: Request):
                 from memforge.config import Config
 
                 Config.model_validate(parsed or {})
-                p.write_text(content, encoding="utf-8")
+                if isinstance(content, str):
+                    p.write_text(content, encoding="utf-8")
+                else:
+                    p.write_text((await content.read()).decode(), encoding="utf-8")
                 saved = True
             except Exception as exc:
                 errors.append(str(exc))
@@ -377,7 +382,7 @@ def _collect_configs() -> list[tuple[str, str, str]]:
 
 
 @router.get("/edit/{file_path:path}", response_class=HTMLResponse)
-async def editor(request: Request, file_path: str):
+async def editor(request: Request, file_path: str) -> HTMLResponse:
     p = _resolve_if_allowed(file_path)
     if p is None:
         return HTMLResponse("<h1>403 - Path outside store</h1>", status_code=403)

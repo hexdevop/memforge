@@ -4,9 +4,11 @@ import sqlite3
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 import httpx
 import pytest
+from anthropic import Anthropic
 
 from memforge.core.llm_log import read_log
 from memforge.core.models import Message, Transcript
@@ -53,7 +55,10 @@ def test_codex_source_parses_latest_conversation(tmp_path: Path):
                 "id": "u1",
                 "parent": "root",
                 "children": ["a1"],
-                "message": {"author": {"role": "user"}, "content": {"parts": ["How do retries work?"]}}
+                "message": {
+                  "author": {"role": "user"},
+                  "content": {"parts": ["How do retries work?"]}
+                }
               },
               "a1": {
                 "id": "a1",
@@ -117,7 +122,9 @@ def test_claude_cli_extractor_parses_embedded_json_array():
     extractor = ClaudeCliExtractor(max_units=2)
 
     units = extractor._parse_response(
-        'Prelude [{"type":"pattern","title":"Retry","body_md":"Body","tags":["ops"],"confidence":"high"}] epilogue'
+        "Prelude "
+        '[{"type":"pattern","title":"Retry","body_md":"Body","tags":["ops"],"confidence":"high"}]'
+        " epilogue"
     )
 
     assert len(units) == 1
@@ -169,7 +176,10 @@ def test_claude_sdk_extractor_parses_json_array_without_client_init():
     extractor._max_units = 5
 
     units = extractor._parse_response(
-        'Prelude [{"type":"decision","title":"Use Postgres","body_md":"Body","tags":["db"],"confidence":"medium","links":["https://example.com"]}] epilogue'
+        "Prelude "
+        '[{"type":"decision","title":"Use Postgres","body_md":"Body",'
+        '"tags":["db"],"confidence":"medium","links":["https://example.com"]}]'
+        " epilogue"
     )
 
     assert len(units) == 1
@@ -182,7 +192,8 @@ def test_claude_sdk_extractor_parses_units_object_without_client_init():
     extractor._max_units = 5
 
     units = extractor._parse_response(
-        '{"units":[{"type":"pattern","title":"Circuit Breaker","body_md":"Body","tags":["resilience"],"confidence":"high"}]}'
+        '{"units":[{"type":"pattern","title":"Circuit Breaker","body_md":"Body",'
+        '"tags":["resilience"],"confidence":"high"}]}'
     )
 
     assert len(units) == 1
@@ -198,18 +209,24 @@ async def test_claude_sdk_extract_success_reads_text_block_and_logs(tmp_path: Pa
     extractor._max_units = 5
     extractor._language = "en"
     extractor._system_prompt = "system"
-    extractor._client = SimpleNamespace(
-        messages=SimpleNamespace(
-            create=lambda **kwargs: SimpleNamespace(
-                content=[
-                    SimpleNamespace(
-                        type="text",
-                        text='[{"type":"pattern","title":"Retry","body_md":"Body","tags":[],"confidence":"high"}]',
+    extractor._client = cast(
+        Anthropic,
+        cast(
+            object,
+            SimpleNamespace(
+                messages=SimpleNamespace(
+                    create=lambda **kwargs: SimpleNamespace(
+                        content=[
+                            SimpleNamespace(
+                                type="text",
+                                text='[{"type":"pattern","title":"Retry","body_md":"Body","tags":[],"confidence":"high"}]',
+                            )
+                        ],
+                        usage=SimpleNamespace(input_tokens=10, output_tokens=5),
                     )
-                ],
-                usage=SimpleNamespace(input_tokens=10, output_tokens=5),
-            )
-        )
+                )
+            ),
+        ),
     )
     transcript = Transcript(messages=[Message(role="user", content="hello")])
 
@@ -236,7 +253,9 @@ async def test_claude_sdk_extract_raises_api_error_and_logs(tmp_path: Path):
     def raise_api_error(**kwargs):
         raise anthropic.APIError("boom", httpx.Request("POST", "https://example.com"), body=None)
 
-    extractor._client = SimpleNamespace(messages=SimpleNamespace(create=raise_api_error))
+    extractor._client = cast(
+        Anthropic, cast(object, SimpleNamespace(messages=SimpleNamespace(create=raise_api_error)))
+    )
     transcript = Transcript(messages=[Message(role="user", content="hello")])
 
     with pytest.raises(anthropic.APIError):

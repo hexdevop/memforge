@@ -8,8 +8,8 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException
 from fastapi.responses import HTMLResponse
 
-from memforge.config import GLOBAL_ROOT, load_config
-from memforge.core.models import Article, ArticleFrontMatter
+from memforge.config import GLOBAL_ROOT, Config, load_config
+from memforge.core.models import Article, ArticleFrontMatter, Draft
 from memforge.core.storage import Store, slugify
 
 router = APIRouter()
@@ -27,7 +27,7 @@ def _resolve_if_allowed(path_str: str) -> Path | None:
     return None
 
 
-def _config_for_store(store: Store):
+def _config_for_store(store: Store) -> Config:
     if store.root.resolve() == GLOBAL_ROOT.resolve():
         return load_config()
     return load_config(store.root.parent)
@@ -39,7 +39,7 @@ def _config_for_store(store: Store):
 
 
 @router.get("/daily-content", response_class=HTMLResponse)
-async def daily_content(path: str):
+async def daily_content(path: str) -> HTMLResponse:
     from markdown_it import MarkdownIt
 
     p = _resolve_if_allowed(path)
@@ -62,7 +62,7 @@ async def daily_content(path: str):
     return HTMLResponse("<hr class='my-4'>".join(html_parts) or "<em>Empty</em>")
 
 
-def _find_store_for_draft(draft_id: str) -> tuple[Store, None] | tuple[None, None]:
+def _find_store_for_draft(draft_id: str) -> tuple[Store | None, Draft | None]:
     for root in [Path.cwd() / ".memforge", GLOBAL_ROOT]:
         store = Store(root)
         if store.memory.exists():
@@ -109,7 +109,7 @@ def _store_for_path(path: Path) -> Store | None:
 
 
 @router.post("/commit/{draft_id}", response_class=HTMLResponse)
-async def commit_draft(draft_id: str):
+async def commit_draft(draft_id: str) -> HTMLResponse:
     store, draft = _find_store_for_draft(draft_id)
     if not store or not draft:
         raise HTTPException(status_code=404, detail="Draft not found")
@@ -147,7 +147,7 @@ async def commit_draft(draft_id: str):
 
 
 @router.post("/discard/{draft_id}", response_class=HTMLResponse)
-async def discard_draft(draft_id: str):
+async def discard_draft(draft_id: str) -> HTMLResponse:
     for root in [Path.cwd() / ".memforge", GLOBAL_ROOT]:
         store = Store(root)
         if store.memory.exists() and store.delete_draft(draft_id):
@@ -161,7 +161,7 @@ async def discard_draft(draft_id: str):
 
 
 @router.post("/forget/{slug}", response_class=HTMLResponse)
-async def forget_article(slug: str):
+async def forget_article(slug: str) -> HTMLResponse:
     store, article = _find_store_for_slug(slug)
     if not store or not article:
         raise HTTPException(status_code=404, detail="Article not found")
@@ -184,7 +184,7 @@ async def forget_article(slug: str):
 
 
 @router.put("/article", response_class=HTMLResponse)
-async def save_article(file_path: str = Form(...), content: str = Form(...)):
+async def save_article(file_path: str = Form(...), content: str = Form(...)) -> HTMLResponse:
     p = _resolve_if_allowed(file_path)
     if p is None:
         raise HTTPException(status_code=403, detail="Path outside store")
@@ -208,7 +208,7 @@ async def save_article(file_path: str = Form(...), content: str = Form(...)):
 
 
 @router.post("/pin/{slug}", response_class=HTMLResponse)
-async def pin_article(slug: str):
+async def pin_article(slug: str) -> HTMLResponse:
     store = _find_store_for_pinned_slug(slug)
     if store and store.find_article_by_slug(slug):
         store.pin(slug)
@@ -220,7 +220,7 @@ async def pin_article(slug: str):
 
 
 @router.post("/unpin/{slug}", response_class=HTMLResponse)
-async def unpin_article(slug: str):
+async def unpin_article(slug: str) -> HTMLResponse:
     store = _find_store_for_pinned_slug(slug)
     if store:
         store.unpin(slug)
@@ -237,7 +237,7 @@ async def unpin_article(slug: str):
 
 
 @router.get("/preview", response_class=HTMLResponse)
-async def preview(content: str = ""):
+async def preview(content: str = "") -> HTMLResponse:
     from markdown_it import MarkdownIt
 
     md = MarkdownIt()

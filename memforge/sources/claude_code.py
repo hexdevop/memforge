@@ -106,7 +106,7 @@ class ClaudeCodeSource:
 def _extract_content(msg: dict) -> str:  # type: ignore[type-arg]
     """Extract text from Claude Code message structure."""
     if isinstance(msg.get("content"), str):
-        return msg["content"]
+        return str(msg["content"])
     if isinstance(msg.get("content"), list):
         parts: list[str] = []
         for block in msg["content"]:

@@ -295,7 +295,7 @@ def _render_article(article: Article) -> str:
     if fm.quarantine:
         meta["quarantine"] = True
     post = frontmatter.Post(article.body, **meta)
-    return frontmatter.dumps(post)
+    return str(frontmatter.dumps(post))
 
 
 def _parse_article(path: Path) -> Article | None:

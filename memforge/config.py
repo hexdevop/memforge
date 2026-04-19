@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field, field_validator
@@ -115,14 +115,15 @@ class Config(BaseModel):
         return v
 
 
-def _load_yaml(path: Path) -> dict:  # type: ignore[type-arg]
+def _load_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     with path.open("r", encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
+        data = yaml.safe_load(f)
+        return data if isinstance(data, dict) else {}
 
 
-def _deep_merge(base: dict, override: dict) -> dict:  # type: ignore[type-arg]
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     result = dict(base)
     for k, v in override.items():
         if k in result and isinstance(result[k], dict) and isinstance(v, dict):
@@ -138,7 +139,7 @@ GLOBAL_ROOT = Path(os.environ.get("MEMFORGE_GLOBAL", "~/.memforge")).expanduser(
 def load_config(project_root: Path | None = None) -> Config:
     """Load and merge global + project configs."""
     global_cfg = _load_yaml(GLOBAL_ROOT / "config.yaml")
-    project_cfg: dict = {}  # type: ignore[type-arg]
+    project_cfg: dict[str, Any] = {}
     if project_root is not None:
         project_cfg = _load_yaml(project_root / ".memforge" / "config.yaml")
     merged = _deep_merge(global_cfg, project_cfg)

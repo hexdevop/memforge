@@ -125,11 +125,11 @@ class ClaudeExtractor:
                 record_type = "pattern"
             try:
                 unit = ExtractedUnit(
-                    type=record_type,  # type: ignore[arg-type]
+                    type=record_type,
                     title=str(item.get("title", "Untitled")),
                     body_md=str(item.get("body_md", "")),
                     tags=[str(t) for t in item.get("tags", [])],
-                    confidence=item.get("confidence", "medium"),  # type: ignore[arg-type]
+                    confidence=item.get("confidence", "medium"),
                     links=[str(link) for link in item.get("links", [])],
                 )
                 units.append(unit)

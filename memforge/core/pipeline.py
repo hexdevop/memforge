@@ -6,11 +6,11 @@ import logging
 import os
 import shutil
 from dataclasses import dataclass
-from pathlib import Path
 
 from memforge.config import Config
 from memforge.core.models import Draft, Transcript
 from memforge.core.storage import Store
+from memforge.extractors import ClaudeCliExtractor, ClaudeExtractor
 from memforge.scrubber.regex import scrub
 
 log = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ class SaveResult:
     backend_used: str = "unknown"
 
 
-def _select_extractor(cfg: Config, log_dir: Path):
+def _select_extractor(cfg: Config) -> tuple[ClaudeCliExtractor | ClaudeExtractor, str]:
     """Return the right extractor based on config and environment."""
     backend = getattr(cfg.extractor, "backend", "auto")
 
@@ -77,7 +77,7 @@ async def run_save(
 ) -> SaveResult:
     transcript_hash = transcript.hash
 
-    extractor, backend = _select_extractor(config, store.logs)
+    extractor, backend = _select_extractor(config)
     units = await extractor.extract(
         transcript,
         note=note,

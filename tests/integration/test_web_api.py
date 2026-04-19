@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from git import Repo
 
-from memforge.config import Config, save_config
+from memforge.config import Config, GitConfig, save_config
 from memforge.core.models import Article, ArticleFrontMatter, ExtractedUnit
 from memforge.core.storage import Store
 from memforge.web.app import create_app
@@ -219,7 +219,10 @@ def test_save_article(store: Store, client: TestClient):
         "/api/article",
         data={
             "file_path": str(path),
-            "content": "---\nid: dec-editable\ntype: decision\ntitle: Editable Article\nslug: editable\ntags: []\nconfidence: high\n---\n\n## Updated\nNew content.",
+            "content": (
+                "---\nid: dec-editable\ntype: decision\ntitle: Editable Article\n"
+                "slug: editable\ntags: []\nconfidence: high\n---\n\n## Updated\nNew content."
+            ),
         },
     )
     assert resp.status_code == 200
@@ -314,8 +317,8 @@ def test_save_article_uses_project_store_config_for_autocommit(tmp_path: Path, m
     global_store.init_git()
     project_store.init_git()
 
-    save_config(Config(git={"auto_commit": True}), global_root / "config.yaml")
-    save_config(Config(git={"auto_commit": False}), project_root / "config.yaml")
+    save_config(Config(git=GitConfig(auto_commit=True)), global_root / "config.yaml")
+    save_config(Config(git=GitConfig(auto_commit=False)), project_root / "config.yaml")
 
     article = _make_article("project-article", "Project Article")
     article_path = project_store.write_article(article)

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -65,7 +66,7 @@ def _make_unit(
     body: str = "## Problem\nHigh traffic spikes.\n## Solution\nToken bucket with Redis.",
 ) -> ExtractedUnit:
     return ExtractedUnit(
-        type=type_,
+        type=cast(Literal["decision", "pattern", "gotcha", "contract", "glossary", "todo"], type_),
         title=title,
         body_md=body,
         tags=["redis", "rate-limiting"],

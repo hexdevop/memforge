@@ -202,11 +202,11 @@ class ClaudeCliExtractor:
             try:
                 units.append(
                     ExtractedUnit(
-                        type=rtype,  # type: ignore[arg-type]
+                        type=rtype,
                         title=str(item.get("title", "Untitled")),
                         body_md=str(item.get("body_md", "")),
                         tags=[str(t) for t in item.get("tags", [])],
-                        confidence=item.get("confidence", "medium"),  # type: ignore[arg-type]
+                        confidence=item.get("confidence", "medium"),
                     )
                 )
             except Exception as exc:
