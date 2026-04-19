@@ -19,7 +19,10 @@ _DEFAULT_PATTERNS: list[tuple[str, str]] = [
     ("rsa-private-key", r"-----BEGIN RSA PRIVATE KEY-----"),
     ("private-key", r"-----BEGIN (?:EC|DSA|OPENSSH) PRIVATE KEY-----"),
     ("jwt", r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"),
-    ("generic-secret", r"(?i)(?:secret|password|passwd|token|api[-_]?key)\s*[:=]\s*['\"]?[A-Za-z0-9_/+\-]{16,}['\"]?"),
+    (
+        "generic-secret",
+        r"(?i)(?:secret|password|passwd|token|api[-_]?key)\s*[:=]\s*['\"]?[A-Za-z0-9_/+\-]{16,}['\"]?",
+    ),
 ]
 
 _STRICT_EXTRA: list[tuple[str, str]] = [
@@ -91,31 +94,40 @@ def _detect_secrets_scan(text: str) -> tuple[str, list[tuple[str, str]]]:
         return text, []
 
     try:
-        cfg = {"plugins_used": [{"name": p} for p in (
-            "AWSKeyDetector",
-            "ArtifactoryDetector",
-            "AzureStorageKeyDetector",
-            "BasicAuthDetector",
-            "CloudantDetector",
-            "GitHubTokenDetector",
-            "HexHighEntropyString",
-            "IbmCloudIamDetector",
-            "IbmCosHmacDetector",
-            "JwtTokenDetector",
-            "MailchimpDetector",
-            "NpmDetector",
-            "PrivateKeyDetector",
-            "SendGridDetector",
-            "SlackDetector",
-            "SoftlayerDetector",
-            "SquareOAuthDetector",
-            "StripeDetector",
-            "TwilioKeyDetector",
-        )]}
+        cfg = {
+            "plugins_used": [
+                {"name": p}
+                for p in (
+                    "AWSKeyDetector",
+                    "ArtifactoryDetector",
+                    "AzureStorageKeyDetector",
+                    "BasicAuthDetector",
+                    "CloudantDetector",
+                    "GitHubTokenDetector",
+                    "HexHighEntropyString",
+                    "IbmCloudIamDetector",
+                    "IbmCosHmacDetector",
+                    "JwtTokenDetector",
+                    "MailchimpDetector",
+                    "NpmDetector",
+                    "PrivateKeyDetector",
+                    "SendGridDetector",
+                    "SlackDetector",
+                    "SoftlayerDetector",
+                    "SquareOAuthDetector",
+                    "StripeDetector",
+                    "TwilioKeyDetector",
+                )
+            ]
+        }
         with transient_settings(cfg):
             secrets = SecretsCollection()
-            import tempfile, os
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as tmp:
+            import os
+            import tempfile
+
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".txt", delete=False, encoding="utf-8"
+            ) as tmp:
                 tmp.write(text)
                 tmp_path = tmp.name
             try:
@@ -130,11 +142,15 @@ def _detect_secrets_scan(text: str) -> tuple[str, list[tuple[str, str]]]:
                 lineno = secret.line_number - 1
                 if 0 <= lineno < len(lines):
                     original = lines[lineno]
-                    lines[lineno] = re.sub(
-                        re.escape(secret.secret_value or ""),
-                        "[REDACTED:detect-secrets]",
-                        original,
-                    ) if secret.secret_value else original
+                    lines[lineno] = (
+                        re.sub(
+                            re.escape(secret.secret_value or ""),
+                            "[REDACTED:detect-secrets]",
+                            original,
+                        )
+                        if secret.secret_value
+                        else original
+                    )
                     if lines[lineno] != original:
                         redacted.append(("detect-secrets", (secret.secret_value or "")[:40]))
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from memforge.core.models import Message, Transcript
@@ -18,7 +18,9 @@ class ClaudeCodeSource:
     name = "claude-code"
 
     def __init__(self, root: Path | None = None, cwd: Path | None = None) -> None:
-        self._root = root or Path(os.environ.get("CLAUDE_PROJECTS_ROOT", "~/.claude/projects")).expanduser()
+        self._root = (
+            root or Path(os.environ.get("CLAUDE_PROJECTS_ROOT", "~/.claude/projects")).expanduser()
+        )
         self._cwd = cwd or Path.cwd()
 
     # ------------------------------------------------------------------
@@ -123,6 +125,6 @@ def _parse_ts(raw: object) -> datetime | None:
     if not raw:
         return None
     try:
-        return datetime.fromisoformat(str(raw)).astimezone(timezone.utc)
+        return datetime.fromisoformat(str(raw)).astimezone(UTC)
     except (ValueError, TypeError):
         return None

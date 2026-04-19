@@ -5,7 +5,7 @@ LLM calls are mocked so the tests run without an API key.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -21,10 +21,9 @@ from memforge.core.models import (
     Message,
     Transcript,
 )
-from memforge.core.pipeline import SaveResult, run_save
+from memforge.core.pipeline import run_save
 from memforge.core.retriever import retrieve
 from memforge.core.storage import Store
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -43,7 +42,7 @@ def transcript() -> Transcript:
     return Transcript(
         session_id="integ-test-01",
         agent="claude-code",
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
         messages=[
             Message(role="user", content="How should we handle rate limiting?"),
             Message(
@@ -105,9 +104,7 @@ async def test_save_creates_drafts(store: Store, transcript: Transcript, config:
 
 @pytest.mark.asyncio
 async def test_save_quarantines_secrets(store: Store, transcript: Transcript, config: Config):
-    unit = _make_unit(
-        body="## Key\nAWS secret: AKIAIOSFODNN7EXAMPLE\n## Use\nSign requests."
-    )
+    unit = _make_unit(body="## Key\nAWS secret: AKIAIOSFODNN7EXAMPLE\n## Use\nSign requests.")
 
     async def fake_extract(*a, **kw):
         return [unit]
@@ -185,7 +182,7 @@ def test_daily_multiple_commits_same_day(store: Store):
         )
         store.append_to_daily(Article(front_matter=fm, body=unit.body_md))
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     daily_path = store.daily / f"{today}.md"
     content = daily_path.read_text("utf-8")
     assert content.count("---") >= 2  # separator appears between entries
@@ -288,7 +285,9 @@ def test_build_index_and_recall(store: Store):
         store.write_article(Article(front_matter=fm, body=f"## Solution\n{title} details."))
 
     articles = list(store.iter_articles())
-    index_content = build_index(articles, pinned_slugs=[], max_tokens=8000, order=["type", "confidence"])
+    index_content = build_index(
+        articles, pinned_slugs=[], max_tokens=8000, order=["type", "confidence"]
+    )
     write_index(store.knowledge, index_content)
 
     assert store.index_file.exists()

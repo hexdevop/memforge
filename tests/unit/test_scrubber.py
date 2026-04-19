@@ -1,6 +1,5 @@
 """Unit tests for the scrubber."""
 
-import pytest
 from memforge.scrubber.regex import scrub
 
 

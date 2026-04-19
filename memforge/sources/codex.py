@@ -23,7 +23,7 @@ Format (simplified):
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from memforge.core.models import Message, Transcript
@@ -80,11 +80,7 @@ class CodexSource:
             return None
 
         create_time = conv.get("create_time")
-        started_at = (
-            datetime.fromtimestamp(create_time, tz=timezone.utc)
-            if create_time
-            else None
-        )
+        started_at = datetime.fromtimestamp(create_time, tz=UTC) if create_time else None
 
         return Transcript(
             session_id=conv.get("id", conv.get("title", "unknown")),

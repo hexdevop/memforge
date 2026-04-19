@@ -4,16 +4,14 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import datetime, timezone
+from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterator
 
 import frontmatter
 import git
-import yaml
 
 from memforge.core.models import Article, ArticleFrontMatter, Draft, ExtractedUnit, RecordType
-
 
 # ---------------------------------------------------------------------------
 # Path helpers
@@ -164,7 +162,9 @@ class Store:
                 transcript_hash=post.get("transcript_hash", ""),
                 source_agent=post.get("source_agent", "unknown"),
                 source_session_id=post.get("source_session_id", ""),
-                created_at=datetime.fromisoformat(post.get("created_at", datetime.now(timezone.utc).isoformat())),
+                created_at=datetime.fromisoformat(
+                    post.get("created_at", datetime.now(UTC).isoformat())
+                ),
                 quarantine=post.get("quarantine", False),
             )
         except Exception:
@@ -182,7 +182,7 @@ class Store:
     # ------------------------------------------------------------------
 
     def append_to_daily(self, article: Article, date: datetime | None = None) -> Path:
-        day = (date or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+        day = (date or datetime.now(UTC)).strftime("%Y-%m-%d")
         path = self.daily / f"{day}.md"
         entry = _render_article(article)
         if path.exists():
@@ -309,8 +309,8 @@ def _parse_article(path: Path) -> Article | None:
             slug=post["slug"],
             scope=post.get("scope", "project"),
             tags=post.get("tags", []),
-            created=datetime.fromisoformat(str(post.get("created", datetime.now(timezone.utc).isoformat()))),
-            updated=datetime.fromisoformat(str(post.get("updated", datetime.now(timezone.utc).isoformat()))),
+            created=datetime.fromisoformat(str(post.get("created", datetime.now(UTC).isoformat()))),
+            updated=datetime.fromisoformat(str(post.get("updated", datetime.now(UTC).isoformat()))),
             source_agent=src.get("agent") if src else None,
             source_session_id=src.get("session_id") if src else None,
             transcript_hash=src.get("transcript_hash") if src else None,

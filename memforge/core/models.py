@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
-
 
 RecordType = Literal["decision", "pattern", "gotcha", "contract", "glossary", "todo"]
 RecordStatus = Literal["active", "deprecated", "archived"]
@@ -80,8 +79,8 @@ class ArticleFrontMatter(BaseModel):
     slug: str
     scope: Scope = "project"
     tags: list[str] = Field(default_factory=list)
-    created: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated: datetime = Field(default_factory=lambda: datetime.now(UTC))
     source_agent: str | None = None
     source_session_id: str | None = None
     transcript_hash: str | None = None
@@ -120,7 +119,7 @@ class Draft(BaseModel):
     transcript_hash: str
     source_agent: str
     source_session_id: str
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     quarantine: bool = False
 
 

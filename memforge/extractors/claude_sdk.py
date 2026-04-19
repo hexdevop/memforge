@@ -8,7 +8,7 @@ from pathlib import Path
 
 import anthropic
 
-from memforge.core.models import ExtractedUnit, RecordType, Transcript
+from memforge.core.models import ExtractedUnit, Transcript
 
 log = logging.getLogger(__name__)
 
@@ -63,9 +63,7 @@ class ClaudeExtractor:
                 log.error("Anthropic API error during extraction: %s", e)
                 raise
 
-        text = next(
-            (block.text for block in response.content if block.type == "text"), ""
-        )
+        text = next((block.text for block in response.content if block.type == "text"), "")
         return self._parse_response(text)
 
     def _build_user_message(
@@ -87,17 +85,33 @@ class ClaudeExtractor:
         return "\n".join(parts)
 
     def _parse_response(self, text: str) -> list[ExtractedUnit]:
-        # Extract JSON array from the response
-        start = text.find("[")
-        end = text.rfind("]") + 1
-        if start == -1 or end == 0:
-            log.warning("Extractor returned no JSON array; returning empty list")
+        # Accept either a bare JSON array or an object like {"units": [...]}.
+        array_start = text.find("[")
+        object_start = text.find("{")
+
+        candidates: list[tuple[int, int]] = []
+        if array_start != -1:
+            candidates.append((array_start, text.rfind("]") + 1))
+        if object_start != -1:
+            candidates.append((object_start, text.rfind("}") + 1))
+
+        for start, end in sorted(candidates, key=lambda item: item[0]):
+            if end <= start:
+                continue
+            try:
+                data = json.loads(text[start:end])
+                break
+            except json.JSONDecodeError:
+                continue
+        else:
+            log.warning("Extractor returned no JSON payload; returning empty list")
             return []
 
-        try:
-            raw_list = json.loads(text[start:end])
-        except json.JSONDecodeError as e:
-            log.error("Failed to parse extractor JSON: %s", e)
+        if isinstance(data, dict):
+            raw_list = data.get("units", [])
+        elif isinstance(data, list):
+            raw_list = data
+        else:
             return []
 
         units: list[ExtractedUnit] = []
@@ -116,7 +130,7 @@ class ClaudeExtractor:
                     body_md=str(item.get("body_md", "")),
                     tags=[str(t) for t in item.get("tags", [])],
                     confidence=item.get("confidence", "medium"),  # type: ignore[arg-type]
-                    links=[str(l) for l in item.get("links", [])],
+                    links=[str(link) for link in item.get("links", [])],
                 )
                 units.append(unit)
             except Exception as e:

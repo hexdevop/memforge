@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from memforge.core.models import Article, IndexEntry, RecordType
@@ -18,13 +18,13 @@ def build_index(
     if order is None:
         order = ["pinned", "recent", "cited"]
 
-    entries = [_article_to_entry(a, pinned_slugs) for a in articles]
-    entries = [e for e in entries if e is not None]
+    entries_raw = [_article_to_entry(a, pinned_slugs) for a in articles]
+    entries: list[IndexEntry] = [e for e in entries_raw if e is not None]
 
     # Sort: pinned first, then by updated desc
     pinned = [e for e in entries if e.pinned]
     rest = [e for e in entries if not e.pinned]
-    rest.sort(key=lambda e: e.updated or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    rest.sort(key=lambda e: e.updated or datetime.min.replace(tzinfo=UTC), reverse=True)
     ordered = pinned + rest
 
     # Group by type and topic
@@ -38,7 +38,7 @@ def build_index(
 
     lines: list[str] = [
         "# MemForge Index",
-        f"# Generated: {datetime.now(timezone.utc).isoformat()}",
+        f"# Generated: {datetime.now(UTC).isoformat()}",
         f"# Articles: {len(entries)}",
         "",
     ]

@@ -5,8 +5,9 @@ from __future__ import annotations
 import asyncio
 import os
 import subprocess
+from datetime import UTC
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -15,7 +16,7 @@ from rich.table import Table
 from memforge.config import GLOBAL_ROOT, Config, load_config, save_config
 from memforge.core.compiler import Compiler
 from memforge.core.indexer import build_index, write_index
-from memforge.core.models import RecordType
+from memforge.core.models import Transcript
 from memforge.core.pipeline import run_save
 from memforge.core.retriever import retrieve
 from memforge.core.storage import Store
@@ -81,7 +82,7 @@ def init(
 
     if not no_git:
         try:
-            repo = store.init_git()
+            store.init_git()
             console.print(f"[green]✓[/] Git repository at {root}")
         except Exception as e:
             console.print(f"[yellow]⚠[/] Git init skipped: {e}")
@@ -99,13 +100,16 @@ def save(
     source: Annotated[
         str, typer.Option("--source", help="Source: auto|claude|cursor|chatgpt|stdin|file")
     ] = "auto",
-    file: Annotated[Optional[Path], typer.Option("--file", help="Input file path")] = None,
-    note: Annotated[Optional[str], typer.Option("--note", help="User note for extractor")] = None,
+    file: Annotated[Path | None, typer.Option("--file", help="Input file path")] = None,
+    note: Annotated[str | None, typer.Option("--note", help="User note for extractor")] = None,
     type_hint: Annotated[
-        Optional[str], typer.Option("--type", help="Hint type: decision|pattern|gotcha|contract|glossary|todo")
+        str | None,
+        typer.Option("--type", help="Hint type: decision|pattern|gotcha|contract|glossary|todo"),
     ] = None,
     scope: Annotated[str, typer.Option("--scope", help="global|project|both")] = "both",
-    dry_run: Annotated[bool, typer.Option("--dry-run", help="Extract but don't write drafts")] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Extract but don't write drafts")
+    ] = False,
 ) -> None:
     """Extract knowledge from latest session and put drafts in inbox."""
     cfg = _load_cfg(scope)
@@ -120,7 +124,9 @@ def save(
         console.print("[red]✗[/] No transcript found. Use --file or --source.")
         raise typer.Exit(1)
 
-    console.print(f"[dim]Extracting from {transcript.agent} session {transcript.session_id[:8]}…[/]")
+    console.print(
+        f"[dim]Extracting from {transcript.agent} session {transcript.session_id[:8]}…[/]"
+    )
 
     result = asyncio.run(
         run_save(transcript, store, cfg, note=note, hint_type=type_hint, dry_run=dry_run)
@@ -128,7 +134,11 @@ def save(
     console.print(f"[dim]Backend: {result.backend_used}[/]")
 
     if dry_run:
-        console.print(f"[yellow]dry-run:[/] would create {len(result.drafts) or '?'} draft(s). Nothing written.")
+        msg = (
+            f"[yellow]dry-run:[/] would create {len(result.drafts) or '?'} draft(s). "
+            "Nothing written."
+        )
+        console.print(msg)
         return
 
     if not result.drafts:
@@ -143,40 +153,42 @@ def save(
 
     if cfg.git.auto_commit:
         short = transcript.session_id[:8]
-        store.git_commit(f"save(inbox): {len(result.drafts)} draft(s) from {transcript.agent} session {short}")
+        store.git_commit(
+            f"save(inbox): {len(result.drafts)} draft(s) from {transcript.agent} session {short}"
+        )
 
 
-def _load_transcript(source: str, file: Path | None, cfg: Config):  # type: ignore[return]
+def _load_transcript(source: str, file: Path | None, cfg: Config) -> Transcript | None:
     from memforge.sources.claude_code import ClaudeCodeSource
     from memforge.sources.codex import CodexSource
     from memforge.sources.cursor import CursorSource
     from memforge.sources.stdin import FileSource, StdinSource
 
     if source in ("auto", "claude"):
-        s = ClaudeCodeSource()
-        if s.detect():
-            t = s.latest_session()
-            if t:
-                return t
+        s_claude = ClaudeCodeSource()
+        if s_claude.detect():
+            t_claude = s_claude.latest_session()
+            if t_claude:
+                return t_claude
 
     if source in ("auto", "cursor"):
-        s = CursorSource()
-        if s.detect():
-            t = s.latest_session()
-            if t:
-                return t
+        s_cursor = CursorSource()
+        if s_cursor.detect():
+            t_cursor = s_cursor.latest_session()
+            if t_cursor:
+                return t_cursor
 
     if source in ("auto", "chatgpt"):
-        s = CodexSource()
-        if s.detect():
-            t = s.latest_session()
-            if t:
-                return t
+        s_codex = CodexSource()
+        if s_codex.detect():
+            t_codex = s_codex.latest_session()
+            if t_codex:
+                return t_codex
 
     if source in ("auto", "stdin") and not file:
-        s = StdinSource()
-        if s.detect():
-            return s.latest_session()
+        s_stdin = StdinSource()
+        if s_stdin.detect():
+            return s_stdin.latest_session()
 
     if file or source == "file":
         p = file or Path("-")
@@ -220,13 +232,13 @@ def review(
 
 @app.command()
 def commit(
-    draft_ids: Annotated[Optional[list[str]], typer.Argument()] = None,
+    draft_ids: Annotated[list[str] | None, typer.Argument()] = None,
     all_: Annotated[bool, typer.Option("--all", help="Commit all inbox drafts")] = False,
-    message: Annotated[Optional[str], typer.Option("--message", "-m")] = None,
+    message: Annotated[str | None, typer.Option("--message", "-m")] = None,
     scope: Annotated[str, typer.Option("--scope")] = "both",
 ) -> None:
     """Promote inbox drafts to daily log."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from memforge.core.models import Article, ArticleFrontMatter
     from memforge.core.storage import slugify
@@ -238,9 +250,11 @@ def commit(
 
     promoted = 0
     for store in stores:
-        drafts = store.list_drafts() if all_ else [
-            d for d in store.list_drafts() if d.draft_id in (draft_ids or [])
-        ]
+        drafts = (
+            store.list_drafts()
+            if all_
+            else [d for d in store.list_drafts() if d.draft_id in (draft_ids or [])]
+        )
 
         if not drafts:
             continue
@@ -265,7 +279,8 @@ def commit(
             console.print(f"  [green]✓[/] {draft.unit.title}")
             promoted += 1
 
-        git_msg = message or f"commit(daily): promote {len(drafts)} draft(s) to {datetime.now(timezone.utc).strftime('%Y-%m-%d')}"
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
+        git_msg = message or f"commit(daily): promote {len(drafts)} draft(s) to {today}"
         store.git_commit(git_msg, daily_paths)
 
     console.print(f"\n[green]Promoted {promoted} draft(s) to daily log.[/]")
@@ -297,12 +312,12 @@ def discard(
 
 @app.command()
 def compile(
-    since: Annotated[Optional[str], typer.Option("--since", help="ISO date e.g. 2026-04-01")] = None,
+    since: Annotated[str | None, typer.Option("--since", help="ISO date e.g. 2026-04-01")] = None,
     dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
     scope: Annotated[str, typer.Option("--scope")] = "both",
 ) -> None:
     """Merge daily logs into knowledge/ and rebuild index.md."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     cfg = _load_cfg(scope)
     compiler = Compiler(
@@ -314,7 +329,7 @@ def compile(
     since_dt: datetime | None = None
     if since:
         try:
-            since_dt = datetime.fromisoformat(since).replace(tzinfo=timezone.utc)
+            since_dt = datetime.fromisoformat(since).replace(tzinfo=UTC)
         except ValueError:
             console.print(f"[red]✗[/] Invalid date: {since}")
             raise typer.Exit(1)
@@ -333,14 +348,14 @@ def compile(
             write_index(store.knowledge, index_content)
 
         if cfg.git.auto_commit and not dry_run:
-            store.git_commit(
-                f"compile(knowledge): {len(created)} new, {len(updated)} updated"
-            )
+            store.git_commit(f"compile(knowledge): {len(created)} new, {len(updated)} updated")
 
     if dry_run:
         console.print("[yellow]dry-run: no changes written.[/]")
     else:
-        console.print(f"[green]✓[/] Compiled: {total_created} new, {total_updated} updated articles.")
+        console.print(
+            f"[green]✓[/] Compiled: {total_created} new, {total_updated} updated articles."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -352,7 +367,7 @@ def compile(
 def recall(
     query: Annotated[str, typer.Argument()],
     top: Annotated[int, typer.Option("--top", "-n")] = 5,
-    type_filter: Annotated[Optional[str], typer.Option("--type")] = None,
+    type_filter: Annotated[str | None, typer.Option("--type")] = None,
     scope: Annotated[str, typer.Option("--scope")] = "both",
 ) -> None:
     """Search the knowledge base."""
@@ -459,6 +474,7 @@ def forget(
                 console.print(f"[green]✓[/] Archived: {article_id}")
                 return
     console.print(f"[red]✗[/] Article not found: {article_id}")
+    raise typer.Exit(1)
 
 
 @app.command()
@@ -479,6 +495,7 @@ def restore(
                 console.print(f"[green]✓[/] Restored: {article_id}")
                 return
     console.print(f"[red]✗[/] Article not found in archive: {article_id}")
+    raise typer.Exit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -499,7 +516,7 @@ def stats(
     for store in _get_stores(scope):
         articles = list(store.iter_articles())
         type_counts = Counter(a.front_matter.type for a in articles)
-        tag_counts: Counter = Counter()
+        tag_counts: Counter[str] = Counter()
         for a in articles:
             tag_counts.update(a.front_matter.tags)
         drafts = store.list_drafts()
@@ -514,10 +531,11 @@ def stats(
                 block = block.strip()
                 if block:
                     import frontmatter as fm_mod
+
                     try:
                         post = fm_mod.loads(block)
-                        import re as _re
                         from memforge.core.storage import slugify
+
                         slug = post.get("slug") or slugify(post.get("title", ""))
                         if slug not in compiled_slugs:
                             uncompiled += 1
@@ -563,7 +581,7 @@ def stats(
 
 @app.command("diff")
 def diff_cmd(
-    since: Annotated[Optional[str], typer.Option("--since", help="ISO date e.g. 2026-04-01")] = None,
+    since: Annotated[str | None, typer.Option("--since", help="ISO date e.g. 2026-04-01")] = None,
     scope: Annotated[str, typer.Option("--scope")] = "both",
 ) -> None:
     """Show git diff of knowledge/ since a date or last compile."""
@@ -574,8 +592,7 @@ def diff_cmd(
             console.print(f"[yellow]⚠[/] No git repo at {store.root}")
             continue
 
-        cmd = ["git", "-C", str(store.root), "log", "--oneline", "-10",
-               "--", "memory/knowledge/"]
+        cmd = ["git", "-C", str(store.root), "log", "--oneline", "-10", "--", "memory/knowledge/"]
         if since:
             cmd += [f"--after={since}"]
 
@@ -587,11 +604,26 @@ def diff_cmd(
             console.print("[dim]No commits found.[/]")
 
         if since:
-            diff_cmd_args = ["git", "-C", str(store.root), "diff",
-                             f"HEAD@{{'{since}'}}", "--", "memory/knowledge/"]
+            diff_cmd_args = [
+                "git",
+                "-C",
+                str(store.root),
+                "diff",
+                f"HEAD@{{'{since}'}}",
+                "--",
+                "memory/knowledge/",
+            ]
         else:
-            diff_cmd_args = ["git", "-C", str(store.root), "diff", "HEAD~1", "HEAD",
-                             "--", "memory/knowledge/"]
+            diff_cmd_args = [
+                "git",
+                "-C",
+                str(store.root),
+                "diff",
+                "HEAD~1",
+                "HEAD",
+                "--",
+                "memory/knowledge/",
+            ]
 
         diff = subprocess.run(diff_cmd_args, capture_output=True, text=True)
         if diff.stdout.strip():
@@ -670,9 +702,11 @@ def doctor() -> None:
         console.print("[green]✓[/] ANTHROPIC_API_KEY is set → backend: [bold]api[/]")
     elif has_cli:
         import subprocess
+
         ver = subprocess.run(["claude", "--version"], capture_output=True, text=True)
+        ver_str = ver.stdout.strip()
         console.print(
-            f"[green]✓[/] Claude Code CLI found ({ver.stdout.strip()}) → backend: [bold]cli[/] (subscription)"
+            f"[green]✓[/] Claude Code CLI found ({ver_str}) → backend: [bold]cli[/] (subscription)"
         )
     else:
         console.print(
@@ -686,7 +720,7 @@ def doctor() -> None:
     if global_store.memory.exists():
         console.print(f"[green]✓[/] Global store: {GLOBAL_ROOT}")
     else:
-        console.print(f"[yellow]⚠[/] Global store not initialised — run: mem init --global")
+        console.print("[yellow]⚠[/] Global store not initialised — run: mem init --global")
 
     project_store = Store(Path.cwd() / ".memforge")
     if project_store.memory.exists():
@@ -697,6 +731,7 @@ def doctor() -> None:
     # ── Dependencies ─────────────────────────────────────────────────────────
     try:
         import git  # noqa: F401
+
         console.print("[green]✓[/] GitPython available")
     except ImportError:
         console.print("[red]✗[/] GitPython not installed")
@@ -704,6 +739,7 @@ def doctor() -> None:
 
     try:
         import anthropic  # noqa: F401
+
         console.print("[green]✓[/] anthropic SDK available")
     except ImportError:
         if has_key:
@@ -715,9 +751,12 @@ def doctor() -> None:
     # ── detect-secrets (optional) ─────────────────────────────────────────────
     try:
         import detect_secrets  # noqa: F401
+
         console.print("[green]✓[/] detect-secrets available (deep scrubbing enabled)")
     except ImportError:
-        console.print("[dim]-  detect-secrets not installed (optional, pip install memforge[optional])[/]")
+        console.print(
+            "[dim]-  detect-secrets not installed (optional, pip install memforge[optional])[/]"
+        )
 
     if ok:
         console.print("\n[green]All checks passed.[/]")
@@ -734,7 +773,9 @@ def doctor() -> None:
 @app.command("export")
 def export_cmd(
     to: Annotated[str, typer.Option("--to", help="Export format: obsidian")] = "obsidian",
-    out: Annotated[Path, typer.Option("--out", help="Output directory")] = Path("./memforge-export"),
+    out: Annotated[Path, typer.Option("--out", help="Output directory")] = Path(
+        "./memforge-export"
+    ),
     scope: Annotated[str, typer.Option("--scope")] = "both",
 ) -> None:
     """Export knowledge base to an external format."""
@@ -767,7 +808,7 @@ def export_cmd(
 def ui(
     port: Annotated[int, typer.Option("--port", "-p")] = 7777,
     open_browser: Annotated[bool, typer.Option("--open")] = False,
-    token: Annotated[Optional[str], typer.Option("--token")] = None,
+    token: Annotated[str | None, typer.Option("--token")] = None,
 ) -> None:
     """Start the MemForge Web UI."""
     import webbrowser

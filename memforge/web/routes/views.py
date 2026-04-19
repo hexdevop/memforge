@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from memforge.config import GLOBAL_ROOT, load_config
+from memforge.config import GLOBAL_ROOT
 from memforge.core.retriever import retrieve
 from memforge.core.storage import Store
 
@@ -77,6 +77,7 @@ logging:
 
 def _markdown_filter(text: str) -> str:
     from markdown_it import MarkdownIt
+
     return MarkdownIt().render(text)
 
 
@@ -138,13 +139,17 @@ async def dashboard(request: Request):
 
     recent = sorted(recent, key=lambda a: a.front_matter.updated, reverse=True)[:5]
 
-    return _tr(request, "dashboard.html", {
-        "total_articles": total_articles,
-        "total_drafts": total_drafts,
-        "pinned": pinned,
-        "recent": recent,
-        "page": "dashboard",
-    })
+    return _tr(
+        request,
+        "dashboard.html",
+        {
+            "total_articles": total_articles,
+            "total_drafts": total_drafts,
+            "pinned": pinned,
+            "recent": recent,
+            "page": "dashboard",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -189,7 +194,10 @@ async def knowledge(
                 continue
             if tag and tag not in a.front_matter.tags:
                 continue
-            if q and q.lower() not in (a.front_matter.title + " ".join(a.front_matter.tags)).lower():
+            if (
+                q
+                and q.lower() not in (a.front_matter.title + " ".join(a.front_matter.tags)).lower()
+            ):
                 continue
             articles.append(a)
 
@@ -212,15 +220,19 @@ async def knowledge(
         if slugs_ordered:
             articles = [slug_to_article[s] for s in slugs_ordered if s in slug_to_article]
 
-    return _tr(request, "knowledge.html", {
-        "articles": articles,
-        "all_tags": sorted(all_tags),
-        "all_types": sorted(all_types),
-        "q": q,
-        "type_filter": type_filter,
-        "tag": tag,
-        "page": "knowledge",
-    })
+    return _tr(
+        request,
+        "knowledge.html",
+        {
+            "articles": articles,
+            "all_tags": sorted(all_tags),
+            "all_types": sorted(all_types),
+            "q": q,
+            "type_filter": type_filter,
+            "tag": tag,
+            "page": "knowledge",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -234,12 +246,16 @@ async def article_view(request: Request, slug: str):
         article = store.find_article_by_slug(slug)
         if article:
             pinned = slug in store.pinned_slugs()
-            return _tr(request, "article.html", {
-                "article": article,
-                "pinned": pinned,
-                "store_root": str(store.root),
-                "page": "knowledge",
-            })
+            return _tr(
+                request,
+                "article.html",
+                {
+                    "article": article,
+                    "pinned": pinned,
+                    "store_root": str(store.root),
+                    "page": "knowledge",
+                },
+            )
 
     return HTMLResponse("<h1>404 — Article not found</h1>", status_code=404)
 
@@ -284,13 +300,17 @@ async def stats(request: Request):
 
     top_tags = tag_counts.most_common(10)
 
-    return _tr(request, "stats.html", {
-        "total": total,
-        "total_drafts": total_drafts,
-        "type_counts": dict(type_counts),
-        "top_tags": top_tags,
-        "page": "stats",
-    })
+    return _tr(
+        request,
+        "stats.html",
+        {
+            "total": total,
+            "total_drafts": total_drafts,
+            "type_counts": dict(type_counts),
+            "top_tags": top_tags,
+            "page": "stats",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -306,7 +326,6 @@ async def settings_get(request: Request):
 
 @router.post("/settings", response_class=HTMLResponse)
 async def settings_post(request: Request):
-    from fastapi import Form as FastForm
     import yaml
 
     form = await request.form()
@@ -324,6 +343,7 @@ async def settings_post(request: Request):
             try:
                 parsed = yaml.safe_load(content)
                 from memforge.config import Config
+
                 Config.model_validate(parsed or {})
                 p.write_text(content, encoding="utf-8")
                 saved = True
@@ -336,7 +356,10 @@ async def settings_post(request: Request):
 
 def _collect_configs() -> list[tuple[str, str, str]]:
     result = []
-    for label, root in [("Global (~/.memforge)", GLOBAL_ROOT), ("Project (.memforge)", Path.cwd() / ".memforge")]:
+    for label, root in [
+        ("Global (~/.memforge)", GLOBAL_ROOT),
+        ("Project (.memforge)", Path.cwd() / ".memforge"),
+    ]:
         cfg_path = root / "config.yaml"
         if cfg_path.exists():
             content = cfg_path.read_text("utf-8")
@@ -362,8 +385,12 @@ async def editor(request: Request, file_path: str):
         return HTMLResponse("<h1>404 — File not found</h1>", status_code=404)
 
     content = p.read_text("utf-8")
-    return _tr(request, "editor.html", {
-        "file_path": file_path,
-        "content": content,
-        "page": "editor",
-    })
+    return _tr(
+        request,
+        "editor.html",
+        {
+            "file_path": file_path,
+            "content": content,
+            "page": "editor",
+        },
+    )

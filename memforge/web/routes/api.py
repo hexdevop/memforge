@@ -56,7 +56,7 @@ async def daily_content(path: str):
         if block.startswith("---"):
             end = block.find("---", 3)
             if end != -1:
-                block = block[end + 3:].strip()
+                block = block[end + 3 :].strip()
         if block:
             html_parts.append(MarkdownIt().render(block))
     return HTMLResponse("<hr class='my-4'>".join(html_parts) or "<em>Empty</em>")
@@ -174,9 +174,7 @@ async def forget_article(slug: str):
             cfg = _config_for_store(store)
             if cfg.git.auto_commit:
                 store.git_commit(f"forget(archive): {slug}")
-            return HTMLResponse(
-                '<div class="text-amber-600 text-sm">Article archived.</div>'
-            )
+            return HTMLResponse('<div class="text-amber-600 text-sm">Article archived.</div>')
     raise HTTPException(status_code=404, detail="Article file not found")
 
 
@@ -241,6 +239,7 @@ async def unpin_article(slug: str):
 @router.get("/preview", response_class=HTMLResponse)
 async def preview(content: str = ""):
     from markdown_it import MarkdownIt
+
     md = MarkdownIt()
     html = md.render(content)
     return HTMLResponse(html)

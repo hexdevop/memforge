@@ -6,7 +6,7 @@ import hashlib
 import logging
 import subprocess
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from memforge.core.models import Article, ArticleFrontMatter, RecordType
@@ -22,7 +22,6 @@ def _load_prompt(version: str) -> str:
 
 def _call_api(client, model: str, system: str, prompt: str, log_dir: Path | None) -> str:
     """Call Anthropic API directly."""
-    import anthropic
     from memforge.core.llm_log import record_call
 
     _log_dir = log_dir or Path.cwd() / ".memforge" / "logs"
@@ -65,17 +64,21 @@ def _call_cli(system: str, prompt: str, log_dir: Path | None, timeout: int = 120
     if log_dir:
         try:
             from memforge.core.llm_log import _append
-            _append(log_dir, {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "operation": "compile",
-                "model": "claude-subscription",
-                "prompt_version": "v1",
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "cost_usd": 0.0,
-                "latency_ms": latency_ms,
-                "error": None,
-            })
+
+            _append(
+                log_dir,
+                {
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "operation": "compile",
+                    "model": "claude-subscription",
+                    "prompt_version": "v1",
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cost_usd": 0.0,
+                    "latency_ms": latency_ms,
+                    "error": None,
+                },
+            )
         except Exception:
             pass
 
@@ -95,6 +98,7 @@ class Compiler:
         self._client = None
         if self._backend == "api":
             import anthropic
+
             self._client = anthropic.Anthropic()
 
     def compile(
@@ -139,9 +143,7 @@ class Compiler:
         for daily_file in sorted(store.daily.glob("*.md")):
             if since:
                 try:
-                    file_date = datetime.strptime(daily_file.stem, "%Y-%m-%d").replace(
-                        tzinfo=timezone.utc
-                    )
+                    file_date = datetime.strptime(daily_file.stem, "%Y-%m-%d").replace(tzinfo=UTC)
                     if file_date < since:
                         continue
                 except ValueError:
@@ -193,10 +195,7 @@ class Compiler:
         log_dir: Path | None = None,
     ) -> Article | None:
         new_bodies = "\n\n".join(e.get("body", "") for e in new_entries)
-        prompt = (
-            f"EXISTING ARTICLE:\n{existing.body}\n\n"
-            f"NEW ENTRIES:\n{new_bodies}"
-        )
+        prompt = f"EXISTING ARTICLE:\n{existing.body}\n\n" f"NEW ENTRIES:\n{new_bodies}"
 
         try:
             if self._backend == "api":
@@ -212,7 +211,7 @@ class Compiler:
 
         fm = existing.front_matter.model_copy(
             update={
-                "updated": datetime.now(timezone.utc),
+                "updated": datetime.now(UTC),
                 "fingerprint": _fingerprint(merged_body),
             }
         )

@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-import pytest
 from memforge.sources.claude_code import ClaudeCodeSource
 
 
@@ -11,6 +10,7 @@ def test_parse_simple_session(tmp_path: Path):
     session_dir = tmp_path / "abc123"
     session_dir.mkdir()
     import shutil
+
     shutil.copy(fixture, session_dir / "test-session-id.jsonl")
 
     source = ClaudeCodeSource(root=tmp_path, cwd=tmp_path)

@@ -1,6 +1,5 @@
 """Unit tests for config loading."""
 
-import tempfile
 from pathlib import Path
 
 from memforge.config import Config, _deep_merge, load_config, save_config

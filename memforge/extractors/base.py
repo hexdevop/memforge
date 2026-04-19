@@ -13,5 +13,4 @@ class Extractor(Protocol):
         transcript: Transcript,
         note: str | None = None,
         hint_type: str | None = None,
-    ) -> list[ExtractedUnit]:
-        ...
+    ) -> list[ExtractedUnit]: ...

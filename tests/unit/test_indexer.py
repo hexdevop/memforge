@@ -1,6 +1,6 @@
 """Unit tests for indexer."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from memforge.core.indexer import build_index
 from memforge.core.models import Article, ArticleFrontMatter
@@ -14,7 +14,7 @@ def _make_article(slug: str, record_type="decision", tags=None) -> Article:
         slug=slug,
         tags=tags or ["test"],
         confidence="high",
-        updated=datetime.now(timezone.utc),
+        updated=datetime.now(UTC),
     )
     return Article(front_matter=fm, body="body")
 

@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from git import Repo
 from fastapi.testclient import TestClient
+from git import Repo
 
 from memforge.config import Config, save_config
 from memforge.core.models import Article, ArticleFrontMatter, ExtractedUnit
@@ -217,7 +217,10 @@ def test_save_article(store: Store, client: TestClient):
 
     resp = client.put(
         "/api/article",
-        data={"file_path": str(path), "content": "---\nid: dec-editable\ntype: decision\ntitle: Editable Article\nslug: editable\ntags: []\nconfidence: high\n---\n\n## Updated\nNew content."},
+        data={
+            "file_path": str(path),
+            "content": "---\nid: dec-editable\ntype: decision\ntitle: Editable Article\nslug: editable\ntags: []\nconfidence: high\n---\n\n## Updated\nNew content.",
+        },
     )
     assert resp.status_code == 200
     assert "Updated" in path.read_text("utf-8") or resp.status_code == 200

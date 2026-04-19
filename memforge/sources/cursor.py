@@ -5,9 +5,14 @@ Reads chat history from Cursor's SQLite workspace storage.
   macOS:   ~/Library/Application Support/Cursor/User/workspaceStorage/<hash>/state.vscdb
   Linux:   ~/.config/Cursor/User/workspaceStorage/<hash>/state.vscdb
 """
+
 from __future__ import annotations
-import json, os, sqlite3
+
+import json
+import os
+import sqlite3
 from pathlib import Path
+
 from memforge.core.models import Message, Transcript
 
 
@@ -32,7 +37,9 @@ class CursorSource:
         return self._root.exists() and any(self._root.glob("*/state.vscdb"))
 
     def latest_session(self) -> Transcript | None:
-        dbs = sorted(self._root.glob("*/state.vscdb"), key=lambda p: p.stat().st_mtime, reverse=True)
+        dbs = sorted(
+            self._root.glob("*/state.vscdb"), key=lambda p: p.stat().st_mtime, reverse=True
+        )
         for db in dbs:
             t = self._parse_db(db)
             if t and t.messages:
@@ -52,7 +59,10 @@ class CursorSource:
             conn = sqlite3.connect(str(db_path))
             conn.row_factory = sqlite3.Row
             cur = conn.cursor()
-            cur.execute("SELECT value FROM ItemTable WHERE key LIKE '%conversationHistory%' OR key LIKE '%chatHistory%' LIMIT 10")
+            cur.execute(
+                "SELECT value FROM ItemTable WHERE key LIKE '%conversationHistory%' "
+                "OR key LIKE '%chatHistory%' LIMIT 10"
+            )
             rows = cur.fetchall()
             conn.close()
         except Exception:

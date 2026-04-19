@@ -13,32 +13,41 @@ from memforge.core.models import ExtractedUnit, Transcript
 
 log = logging.getLogger(__name__)
 
-_EXTRACT_SCHEMA = json.dumps({
-    "type": "object",
-    "properties": {
-        "units": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "type": {
-                        "type": "string",
-                        "enum": ["decision", "pattern", "gotcha", "contract", "glossary", "todo"],
+_EXTRACT_SCHEMA = json.dumps(
+    {
+        "type": "object",
+        "properties": {
+            "units": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "enum": [
+                                "decision",
+                                "pattern",
+                                "gotcha",
+                                "contract",
+                                "glossary",
+                                "todo",
+                            ],
+                        },
+                        "title": {"type": "string"},
+                        "body_md": {"type": "string"},
+                        "tags": {"type": "array", "items": {"type": "string"}},
+                        "confidence": {
+                            "type": "string",
+                            "enum": ["high", "medium", "low"],
+                        },
                     },
-                    "title": {"type": "string"},
-                    "body_md": {"type": "string"},
-                    "tags": {"type": "array", "items": {"type": "string"}},
-                    "confidence": {
-                        "type": "string",
-                        "enum": ["high", "medium", "low"],
-                    },
+                    "required": ["type", "title", "body_md", "tags", "confidence"],
                 },
-                "required": ["type", "title", "body_md", "tags", "confidence"],
-            },
-        }
-    },
-    "required": ["units"],
-})
+            }
+        },
+        "required": ["units"],
+    }
+)
 
 
 def is_available() -> bool:
@@ -78,9 +87,12 @@ class ClaudeCliExtractor:
         cmd = [
             "claude",
             "--print",
-            "--output-format", "json",
-            "--json-schema", _EXTRACT_SCHEMA,
-            "--system-prompt", self._system_prompt,
+            "--output-format",
+            "json",
+            "--json-schema",
+            _EXTRACT_SCHEMA,
+            "--system-prompt",
+            self._system_prompt,
             user_msg,
         ]
 
@@ -144,17 +156,25 @@ class ClaudeCliExtractor:
             else:
                 data = outer
         except json.JSONDecodeError:
-            # Fallback: find JSON array or object in raw text
-            start = raw.find("{")
-            if start == -1:
-                start = raw.find("[")
-            end = raw.rfind("}") + 1 if "{" in raw else raw.rfind("]") + 1
-            if start == -1 or end <= 0:
-                log.warning("ClaudeCliExtractor: no JSON in response")
-                return []
-            try:
-                data = json.loads(raw[start:end])
-            except json.JSONDecodeError:
+            # Fallback: find JSON array or object embedded in surrounding text.
+            array_start = raw.find("[")
+            object_start = raw.find("{")
+
+            candidates: list[tuple[int, int]] = []
+            if array_start != -1:
+                candidates.append((array_start, raw.rfind("]") + 1))
+            if object_start != -1:
+                candidates.append((object_start, raw.rfind("}") + 1))
+
+            for start, end in sorted(candidates, key=lambda item: item[0]):
+                if end <= start:
+                    continue
+                try:
+                    data = json.loads(raw[start:end])
+                    break
+                except json.JSONDecodeError:
+                    continue
+            else:
                 log.warning("ClaudeCliExtractor: JSON parse failed")
                 return []
 
@@ -180,13 +200,15 @@ class ClaudeCliExtractor:
             if rtype not in valid_types:
                 rtype = "pattern"
             try:
-                units.append(ExtractedUnit(
-                    type=rtype,  # type: ignore[arg-type]
-                    title=str(item.get("title", "Untitled")),
-                    body_md=str(item.get("body_md", "")),
-                    tags=[str(t) for t in item.get("tags", [])],
-                    confidence=item.get("confidence", "medium"),  # type: ignore[arg-type]
-                ))
+                units.append(
+                    ExtractedUnit(
+                        type=rtype,  # type: ignore[arg-type]
+                        title=str(item.get("title", "Untitled")),
+                        body_md=str(item.get("body_md", "")),
+                        tags=[str(t) for t in item.get("tags", [])],
+                        confidence=item.get("confidence", "medium"),  # type: ignore[arg-type]
+                    )
+                )
             except Exception as exc:
                 log.warning("Skipping malformed unit: %s", exc)
 
@@ -197,19 +219,23 @@ class ClaudeCliExtractor:
             return
         try:
             from memforge.core.llm_log import _append
-            _append(log_dir, {
-                "timestamp": __import__("datetime").datetime.now(
-                    __import__("datetime").timezone.utc
-                ).isoformat(),
-                "operation": "extract",
-                "model": "claude-subscription",
-                "prompt_version": self._prompt_version,
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "cost_usd": 0.0,
-                "latency_ms": latency_ms,
-                "error": None,
-                "units_extracted": n_units,
-            })
+
+            _append(
+                log_dir,
+                {
+                    "timestamp": __import__("datetime")
+                    .datetime.now(__import__("datetime").timezone.utc)
+                    .isoformat(),
+                    "operation": "extract",
+                    "model": "claude-subscription",
+                    "prompt_version": self._prompt_version,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cost_usd": 0.0,
+                    "latency_ms": latency_ms,
+                    "error": None,
+                    "units_extracted": n_units,
+                },
+            )
         except Exception:
             pass

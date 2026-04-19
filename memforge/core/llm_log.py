@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 import logging
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Generator
 
 log = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ def record_call(
             meta["output_tokens"] = response.usage.output_tokens
     """
     entry: dict = {  # type: ignore[type-arg]
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "operation": operation,
         "model": model,
         "prompt_version": prompt_version,
@@ -59,9 +59,7 @@ def record_call(
         raise
     finally:
         entry["latency_ms"] = int((time.monotonic() - t0) * 1000)
-        entry["cost_usd"] = _cost_usd(
-            model, entry["input_tokens"], entry["output_tokens"]
-        )
+        entry["cost_usd"] = _cost_usd(model, entry["input_tokens"], entry["output_tokens"])
         _append(log_dir, entry)
 
 
@@ -94,16 +92,11 @@ def summarise(entries: list[dict], since_days: int = 30) -> dict:  # type: ignor
     """Return aggregate stats for UI / mem stats display."""
     from datetime import timedelta
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
-    recent = [
-        e for e in entries
-        if datetime.fromisoformat(e["timestamp"]) >= cutoff
-    ]
+    cutoff = datetime.now(UTC) - timedelta(days=since_days)
+    recent = [e for e in entries if datetime.fromisoformat(e["timestamp"]) >= cutoff]
     total_cost = sum(e.get("cost_usd", 0) for e in recent)
     total_calls = len(recent)
-    total_tokens = sum(
-        e.get("input_tokens", 0) + e.get("output_tokens", 0) for e in recent
-    )
+    total_tokens = sum(e.get("input_tokens", 0) + e.get("output_tokens", 0) for e in recent)
     by_op: dict[str, int] = {}
     for e in recent:
         op = e.get("operation", "unknown")

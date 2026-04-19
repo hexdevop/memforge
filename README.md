@@ -1,5 +1,8 @@
 # MemForge ⚒
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+
 **Local external memory for LLM agents.** Turns transcripts from Claude Code, Cursor, ChatGPT and other AI agents into a structured, versioned, human-readable knowledge base in plain markdown.
 
 > **Philosophy:** no hidden magic, no auto-saves, no timers. Every change to your knowledge base is the result of an explicit command you ran. Human-in-the-loop at every step.

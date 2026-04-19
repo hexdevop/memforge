@@ -7,7 +7,6 @@ from pathlib import Path
 
 from memforge.core.storage import Store
 
-
 _TYPE_FOLDER: dict[str, str] = {
     "decision": "Decisions",
     "pattern": "Patterns",
@@ -60,7 +59,9 @@ def export_to_obsidian(store: Store, out_dir: Path) -> int:
         # Convert `[[slug]]` style refs + add confidence callout header
         body = _convert_wikilinks(article.body)
 
-        header = f"> {confidence_icon} **{fm.type.capitalize()}** — confidence: `{fm.confidence}`\n\n"
+        header = (
+            f"> {confidence_icon} **{fm.type.capitalize()}** — confidence: `{fm.confidence}`\n\n"
+        )
         if fm.tags:
             tag_line = " ".join(f"#{t.replace('-', '_')}" for t in fm.tags) + "\n\n"
         else:
@@ -93,7 +94,9 @@ def _write_index_note(store: Store, out_dir: Path, pinned: set[str]) -> None:
         for article in store.iter_articles():
             if article.slug in pinned:
                 folder = _TYPE_FOLDER.get(article.front_matter.type, "Other")
-                lines.append(f"- [[{folder}/{article.front_matter.title}|{article.front_matter.title}]]\n")
+                lines.append(
+                    f"- [[{folder}/{article.front_matter.title}|{article.front_matter.title}]]\n"
+                )
         lines.append("\n")
 
     by_type: dict[str, list[str]] = {}

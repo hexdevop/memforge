@@ -44,19 +44,27 @@ def _select_extractor(cfg: Config, log_dir: Path):
 
     if backend == "cli":
         from memforge.extractors.claude_cli import ClaudeCliExtractor
-        return ClaudeCliExtractor(
-            prompt_version=cfg.extractor.prompt_version,
-            max_units=cfg.extractor.max_units_per_save,
-            language=cfg.extractor.language,
-        ), "cli"
+
+        return (
+            ClaudeCliExtractor(
+                prompt_version=cfg.extractor.prompt_version,
+                max_units=cfg.extractor.max_units_per_save,
+                language=cfg.extractor.language,
+            ),
+            "cli",
+        )
     else:
         from memforge.extractors.claude_sdk import ClaudeExtractor
-        return ClaudeExtractor(
-            model=cfg.extractor.model,
-            prompt_version=cfg.extractor.prompt_version,
-            max_units=cfg.extractor.max_units_per_save,
-            language=cfg.extractor.language,
-        ), "api"
+
+        return (
+            ClaudeExtractor(
+                model=cfg.extractor.model,
+                prompt_version=cfg.extractor.prompt_version,
+                max_units=cfg.extractor.max_units_per_save,
+                language=cfg.extractor.language,
+            ),
+            "api",
+        )
 
 
 async def run_save(
@@ -80,8 +88,10 @@ async def run_save(
     if not units:
         log.info("Extractor returned no units.")
         return SaveResult(
-            drafts=[], transcript_hash=transcript_hash,
-            quarantined=0, backend_used=backend,
+            drafts=[],
+            transcript_hash=transcript_hash,
+            quarantined=0,
+            backend_used=backend,
         )
 
     drafts: list[Draft] = []

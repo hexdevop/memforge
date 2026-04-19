@@ -76,9 +76,9 @@ def _parse_index(text: str) -> list[dict]:  # type: ignore[type-arg]
     """Parse entries like: - slug (type, confidence) — Title [tags: a, b]"""
     entries: list[dict] = []  # type: ignore[type-arg]
     pattern = re.compile(
-        r"- (?P<slug>\S+) \((?P<type>\w+), (?P<confidence>\w+)\) — (?P<title>[^\[]+?)(?:\s*\[tags: (?P<tags>[^\]]+)\])?$"
+        r"- (?P<slug>\S+) \((?P<type>\w+), (?P<confidence>\w+)\) — "
+        r"(?P<title>[^\[]+?)(?:\s*\[tags: (?P<tags>[^\]]+)\])?$"
     )
-    current_type_section = ""
     for line in text.splitlines():
         line = line.strip()
         if line.startswith("### "):
@@ -86,7 +86,7 @@ def _parse_index(text: str) -> list[dict]:  # type: ignore[type-arg]
             # detect "type (N)" pattern
             m = re.match(r"(\w+)(?:\s+\(\d+\))?", section)
             if m:
-                current_type_section = m.group(1)
+                m.group(1)
         m = pattern.match(line)
         if m:
             tags_str = m.group("tags") or ""
@@ -119,10 +119,10 @@ def _get_snippet(path: Path | None, query: str, max_chars: int) -> str:
         # Return beginning of body (skip front-matter)
         body_start = text.find("---", 3)
         if body_start != -1:
-            text = text[body_start + 3:].lstrip()
+            text = text[body_start + 3 :].lstrip()
         return text[:max_chars].strip()
     start = max(0, pos - 100)
-    snippet = text[start: start + max_chars]
+    snippet = text[start : start + max_chars]
     return snippet.strip()
 
 
