@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "memforge"
+version = "0.1.0"
+description = "Local external memory system for LLM agents"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Ikigai", email = "abduraxmonislomov@gmail.com" }]
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.40",
+    "typer>=0.12",
+    "pydantic>=2.6",
+    "python-frontmatter>=1.1",
+    "rank-bm25>=0.2",
+    "rich>=13.7",
+    "fastapi>=0.110",
+    "python-multipart>=0.0.9",
+    "uvicorn[standard]>=0.27",
+    "jinja2>=3.1",
+    "markdown-it-py>=3.0",
+    "gitpython>=3.1",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+optional = ["detect-secrets>=1.5", "pyperclip>=1.8"]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "mypy>=1.9",
+    "ruff>=0.4",
+    "black>=24.0",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+mem = "memforge.cli.main:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["memforge*"]
+
+[tool.setuptools.package-data]
+memforge = ["prompts/*.md", "web/templates/**/*.html", "web/static/**/*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "--cov=memforge --cov-report=term-missing"

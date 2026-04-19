@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Knowledge — MemForge{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">Knowledge</h1>
+    <span class="text-sm text-gray-500">{{ articles | length }} article(s)</span>
+  </div>
+
+  <!-- Search + filters -->
+  <form method="get" action="/knowledge" class="flex gap-3 mb-6 flex-wrap">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search…"
+           class="flex-1 min-w-48 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+
+    <select name="type_filter"
+            class="px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      <option value="">All types</option>
+      {% for t in all_types %}
+      <option value="{{ t }}" {% if type_filter == t %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="tag"
+            class="px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      <option value="">All tags</option>
+      {% for t in all_tags %}
+      <option value="{{ t }}" {% if tag == t %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+
+    <button type="submit"
+            class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-medium">
+      Search
+    </button>
+    {% if q or type_filter or tag %}
+    <a href="/knowledge" class="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">Clear</a>
+    {% endif %}
+  </form>
+
+  <!-- Article list -->
+  {% if not articles %}
+  <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-10 text-center text-gray-400">
+    <div class="text-4xl mb-3">⊙</div>
+    {% if q or type_filter or tag %}
+    <p>No articles match your filters.</p>
+    {% else %}
+    <p>No articles yet.</p>
+    <p class="text-sm mt-1">Run <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">mem compile</code> to build knowledge from daily logs.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="space-y-2">
+    {% for a in articles %}
+    <a href="/knowledge/{{ a.slug }}"
+       class="flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-600 shadow-sm transition-colors group">
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="badge shrink-0
+          {% if a.front_matter.type == 'decision' %}bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300
+          {% elif a.front_matter.type == 'gotcha' %}bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300
+          {% elif a.front_matter.type == 'pattern' %}bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300
+          {% elif a.front_matter.type == 'contract' %}bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300
+          {% else %}bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300{% endif %}">
+          {{ a.front_matter.type }}
+        </span>
+        <span class="font-medium text-sm truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+          {{ a.front_matter.title }}
+        </span>
+        <div class="flex gap-1 hidden sm:flex">
+          {% for tag in a.front_matter.tags[:3] %}
+          <span class="badge bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">#{{ tag }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="flex items-center gap-3 shrink-0 ml-3">
+        <span class="badge {% if a.front_matter.confidence == 'high' %}bg-emerald-100 text-emerald-700{% elif a.front_matter.confidence == 'medium' %}bg-yellow-100 text-yellow-700{% else %}bg-gray-100 text-gray-500{% endif %}">
+          {{ a.front_matter.confidence }}
+        </span>
+        <span class="text-xs text-gray-400">{{ a.front_matter.updated.strftime('%b %d') }}</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

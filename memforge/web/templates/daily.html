@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Daily — MemForge{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+  <h1 class="text-2xl font-bold mb-6">Daily Logs</h1>
+
+  {% if not days %}
+  <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-10 text-center text-gray-400">
+    <div class="text-4xl mb-3">⊡</div>
+    <p>No daily logs yet.</p>
+    <p class="text-sm mt-1">Run <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">mem commit</code> to promote inbox drafts.</p>
+  </div>
+  {% endif %}
+
+  <div class="space-y-3">
+    {% for day in days %}
+    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm"
+         x-data="{ open: false }">
+      <button @click="open = !open"
+              class="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors">
+        <div class="flex items-center gap-3">
+          <span class="font-mono text-sm font-semibold text-indigo-600 dark:text-indigo-400">{{ day.date }}</span>
+          <span class="text-xs text-gray-400">{{ day.store_root | replace('\\', '/') | truncate(40, True, '…') }}</span>
+        </div>
+        <span class="text-gray-400 text-sm" x-text="open ? '▲' : '▼'"></span>
+      </button>
+
+      <div x-show="open" x-cloak
+           class="border-t border-gray-100 dark:border-gray-700 px-4 py-4"
+           x-init="$watch('open', v => { if (v && !$el.dataset.loaded) { $el.dataset.loaded=1; fetch('/api/daily-content?path={{ day.path | urlencode }}').then(r=>r.text()).then(t=>{ $el.querySelector('.day-content').innerHTML=t }) } })">
+        <div class="day-content prose prose-sm dark:prose-invert max-w-none text-sm text-gray-500">
+          Loading…
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

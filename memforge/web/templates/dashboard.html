@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — MemForge{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl">
+  <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+
+  <!-- Stats row -->
+  <div class="grid grid-cols-3 gap-4 mb-8">
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 shadow-sm">
+      <div class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{{ total_articles }}</div>
+      <div class="text-sm text-gray-500 mt-1">Knowledge articles</div>
+    </div>
+    <a href="/inbox" class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 shadow-sm hover:border-indigo-300 transition-colors">
+      <div class="text-3xl font-bold {% if total_drafts > 0 %}text-amber-500{% else %}text-gray-400{% endif %}">{{ total_drafts }}</div>
+      <div class="text-sm text-gray-500 mt-1">Drafts in inbox</div>
+    </a>
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 shadow-sm">
+      <div class="text-3xl font-bold text-emerald-500">{{ pinned | length }}</div>
+      <div class="text-sm text-gray-500 mt-1">Pinned articles</div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 gap-6">
+    <!-- Pinned -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+      <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-sm flex items-center gap-2">
+        <span>📌</span> Pinned
+      </div>
+      <div class="p-3 space-y-1">
+        {% for a in pinned %}
+        <a href="/knowledge/{{ a.slug }}" class="flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-700 text-sm">
+          <span class="truncate">{{ a.front_matter.title }}</span>
+          <span class="badge bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 ml-2 shrink-0">{{ a.front_matter.type }}</span>
+        </a>
+        {% else %}
+        <p class="text-sm text-gray-400 px-2 py-2">No pinned articles. Use <code>mem pin &lt;slug&gt;</code>.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Recently updated -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+      <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-sm flex items-center gap-2">
+        <span>🕐</span> Recently updated
+      </div>
+      <div class="p-3 space-y-1">
+        {% for a in recent %}
+        <a href="/knowledge/{{ a.slug }}" class="flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-700 text-sm">
+          <span class="truncate">{{ a.front_matter.title }}</span>
+          <span class="text-xs text-gray-400 ml-2 shrink-0">{{ a.front_matter.updated.strftime('%b %d') }}</span>
+        </a>
+        {% else %}
+        <p class="text-sm text-gray-400 px-2 py-2">No articles yet. Run <code>mem compile</code>.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick commands -->
+  <div class="mt-6 bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-sm font-mono text-gray-600 dark:text-gray-300">
+    <div class="font-sans font-semibold text-xs text-gray-400 uppercase tracking-wider mb-2">Quick commands</div>
+    <div class="space-y-1">
+      <div><span class="text-indigo-500">mem save</span> — extract from latest session</div>
+      <div><span class="text-indigo-500">mem compile</span> — merge daily → knowledge</div>
+      <div><span class="text-indigo-500">mem recall</span> <span class="text-gray-400">"query"</span> — search</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

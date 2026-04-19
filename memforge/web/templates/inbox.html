@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Inbox — MemForge{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">Inbox</h1>
+    <span class="text-sm text-gray-500">{{ drafts | length }} draft(s)</span>
+  </div>
+
+  {% if not drafts %}
+  <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-10 text-center text-gray-400">
+    <div class="text-4xl mb-3">✉</div>
+    <p>Inbox is empty.</p>
+    <p class="text-sm mt-1">Run <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">mem save</code> to extract from your latest session.</p>
+  </div>
+  {% endif %}
+
+  <div class="space-y-4" id="inbox-list">
+    {% for item in drafts %}
+    {% set d = item.draft %}
+    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm"
+         id="draft-{{ d.draft_id }}"
+         x-data="{ expanded: false, editing: false, content: {{ d.unit.body_md | tojson }} }">
+
+      <!-- Header -->
+      <div class="px-4 py-3 flex items-start justify-between gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="badge
+              {% if d.unit.type == 'decision' %}bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300
+              {% elif d.unit.type == 'gotcha' %}bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300
+              {% elif d.unit.type == 'pattern' %}bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300
+              {% elif d.unit.type == 'contract' %}bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300
+              {% else %}bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300{% endif %}">
+              {{ d.unit.type }}
+            </span>
+            <span class="badge bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">{{ d.unit.confidence }}</span>
+            {% if d.quarantine %}
+            <span class="badge bg-red-100 text-red-700">⚠ quarantined</span>
+            {% endif %}
+            {% for tag in d.unit.tags %}
+            <span class="badge bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300">#{{ tag }}</span>
+            {% endfor %}
+          </div>
+          <h3 class="font-semibold mt-1">{{ d.unit.title }}</h3>
+          <p class="text-xs text-gray-400 mt-0.5">id: {{ d.draft_id }} · {{ d.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-2 shrink-0">
+          <button @click="expanded = !expanded"
+                  class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1 rounded border border-gray-200 dark:border-gray-600"
+                  x-text="expanded ? 'Hide' : 'Preview'"></button>
+
+          <button @click="editing = !editing; expanded = true"
+                  class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1 rounded border border-gray-200 dark:border-gray-600">
+            Edit
+          </button>
+
+          {% if not d.quarantine %}
+          <button hx-post="/api/commit/{{ d.draft_id }}"
+                  hx-target="#draft-{{ d.draft_id }}"
+                  hx-swap="outerHTML"
+                  hx-confirm="Commit this draft to daily log?"
+                  class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded font-medium">
+            Accept
+          </button>
+          {% endif %}
+
+          <button hx-post="/api/discard/{{ d.draft_id }}"
+                  hx-target="#draft-{{ d.draft_id }}"
+                  hx-swap="outerHTML"
+                  hx-confirm="Discard this draft permanently?"
+                  class="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded border border-red-200 dark:border-red-800">
+            Discard
+          </button>
+        </div>
+      </div>
+
+      <!-- Expandable body -->
+      <div x-show="expanded" x-cloak class="border-t border-gray-100 dark:border-gray-700">
+        <!-- Editor mode -->
+        <div x-show="editing" class="p-4">
+          <textarea x-model="content" rows="12"
+                    class="w-full font-mono text-sm bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded p-3 resize-y focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+          <div class="flex gap-2 mt-2">
+            <button @click="editing = false" class="text-xs text-gray-500 hover:text-gray-700 px-3 py-1 border border-gray-200 rounded">Cancel</button>
+          </div>
+        </div>
+        <!-- Preview mode -->
+        <div x-show="!editing" class="p-4 prose prose-sm dark:prose-invert max-w-none text-sm"
+             x-html="content.replace(/\n/g, '<br>')"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
