@@ -21,7 +21,36 @@
     {% set d = item.draft %}
     <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm"
          id="draft-{{ d.draft_id }}"
-         x-data="{ expanded: false, editing: false, content: {{ d.unit.body_md | tojson }} }">
+         x-data="{
+           expanded: false,
+           editing: false,
+           saving: false,
+           saveMsg: '',
+           content: {{ d.unit.body_md | tojson }},
+           previewHtml: '',
+           async togglePreview() {
+             this.expanded = !this.expanded;
+             if (this.expanded && !this.editing) await this.loadPreview();
+           },
+           async loadPreview() {
+             const params = new URLSearchParams({ content: this.content });
+             const res = await fetch('/api/preview?' + params.toString());
+             this.previewHtml = await res.text();
+           },
+           async saveDraft() {
+             this.saving = true;
+             this.saveMsg = '';
+             const form = new FormData();
+             form.append('content', this.content);
+             const res = await fetch('/api/draft/{{ d.draft_id }}', { method: 'PUT', body: form });
+             const text = await res.text();
+             const div = document.createElement('div');
+             div.innerHTML = text;
+             this.saveMsg = div.textContent || (res.ok ? '✓ Saved' : '✗ Error');
+             this.saving = false;
+             setTimeout(() => { this.saveMsg = ''; }, 3000);
+           }
+         }">
 
       <!-- Header -->
       <div class="px-4 py-3 flex items-start justify-between gap-3">
@@ -48,15 +77,14 @@
         </div>
 
         <!-- Actions -->
-        <div class="flex items-center gap-2 shrink-0">
-          <button @click="expanded = !expanded"
+        <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          <button @click="togglePreview()"
                   class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1 rounded border border-gray-200 dark:border-gray-600"
-                  x-text="expanded ? 'Hide' : 'Preview'"></button>
+                  x-text="expanded ? 'Hide' : '👁 Preview'"></button>
 
-          <button @click="editing = !editing; expanded = true"
-                  class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1 rounded border border-gray-200 dark:border-gray-600">
-            Edit
-          </button>
+          <button @click="editing = !editing; expanded = true; if(editing) {} else loadPreview()"
+                  class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1 rounded border border-gray-200 dark:border-gray-600"
+                  x-text="editing ? 'Cancel' : '✏ Edit'"></button>
 
           {% if not d.quarantine %}
           <button hx-post="/api/commit/{{ d.draft_id }}"
@@ -64,7 +92,7 @@
                   hx-swap="outerHTML"
                   hx-confirm="Commit this draft to daily log?"
                   class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded font-medium">
-            Accept
+            ✓ Accept
           </button>
           {% endif %}
 
@@ -73,24 +101,35 @@
                   hx-swap="outerHTML"
                   hx-confirm="Discard this draft permanently?"
                   class="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded border border-red-200 dark:border-red-800">
-            Discard
+            🗑 Discard
           </button>
         </div>
       </div>
 
       <!-- Expandable body -->
       <div x-show="expanded" x-cloak class="border-t border-gray-100 dark:border-gray-700">
+
         <!-- Editor mode -->
         <div x-show="editing" class="p-4">
           <textarea x-model="content" rows="12"
                     class="w-full font-mono text-sm bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded p-3 resize-y focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
-          <div class="flex gap-2 mt-2">
-            <button @click="editing = false" class="text-xs text-gray-500 hover:text-gray-700 px-3 py-1 border border-gray-200 rounded">Cancel</button>
+          <div class="flex items-center gap-3 mt-2">
+            <button @click="saveDraft()"
+                    :disabled="saving"
+                    class="text-xs bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-3 py-1 rounded font-medium">
+              <span x-text="saving ? 'Saving…' : '💾 Save draft'"></span>
+            </button>
+            <button @click="editing = false; loadPreview()"
+                    class="text-xs text-gray-500 hover:text-gray-700 px-3 py-1 border border-gray-200 rounded">
+              Cancel
+            </button>
+            <span x-text="saveMsg" class="text-xs text-green-600"></span>
           </div>
         </div>
+
         <!-- Preview mode -->
         <div x-show="!editing" class="p-4 prose prose-sm dark:prose-invert max-w-none text-sm"
-             x-html="content.replace(/\n/g, '<br>')"></div>
+             x-html="previewHtml || content.replace(/\n/g, '<br>')"></div>
       </div>
     </div>
     {% endfor %}

@@ -224,7 +224,7 @@ def scan(
         raise typer.Exit(1)
 
     root = path.resolve()
-    scanner = ProjectScanner(root)
+    scanner = ProjectScanner(root, note=note)
     if not scanner.detect():
         console.print(f"[red]✗[/] Directory not found: {root}")
         raise typer.Exit(1)

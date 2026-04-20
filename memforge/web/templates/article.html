@@ -51,22 +51,21 @@
             {% else %}
             <button hx-post="/api/pin/{{ article.slug }}" hx-target="#pin-btn" hx-swap="innerHTML"
                     class="text-xs bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 px-2 py-1 rounded border border-gray-200 dark:border-gray-600">
-              Pin
+              📍 Pin
             </button>
             {% endif %}
           </div>
 
-          <a href="/edit/{{ store_root }}/memory/knowledge/{{ article.front_matter.type }}s/{{ article.slug }}.md"
+          <a href="/edit/{{ file_path }}"
              class="text-xs bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 px-2 py-1 rounded border border-gray-200 dark:border-gray-600 hover:bg-gray-200">
-            Edit
+            ✏ Edit
           </a>
 
           <button hx-post="/api/forget/{{ article.slug }}"
                   hx-confirm="Archive '{{ article.front_matter.title }}'? This moves it to archive/."
-                  hx-target="body"
-                  hx-push-url="/knowledge"
+                  hx-on::after-request="if(event.detail.successful) window.location='/knowledge'"
                   class="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded border border-red-200 dark:border-red-800">
-            Forget
+            🗑 Forget
           </button>
         </div>
       </div>

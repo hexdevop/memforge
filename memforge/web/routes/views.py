@@ -76,6 +76,23 @@ logging:
 """
 
 
+_TYPE_DIR = {
+    "decision": "decisions",
+    "pattern": "concepts",
+    "gotcha": "gotchas",
+    "contract": "contracts",
+    "glossary": "glossary",
+    "todo": "todo-knowledge",
+}
+
+
+def _article_file_path(store_root: Path, article_type: str, slug: str) -> str:
+    """Return the absolute file path for an article, URL-safe (forward slashes)."""
+    dir_name = _TYPE_DIR.get(article_type, f"{article_type}s")
+    p = store_root / "memory" / "knowledge" / dir_name / f"{slug}.md"
+    return str(p).replace("\\", "/")
+
+
 def _markdown_filter(text: str) -> str:
     from markdown_it import MarkdownIt
 
@@ -213,7 +230,7 @@ async def knowledge(
                 retrieve(
                     query=q,
                     index_path=store.index_file,
-                    articles_root=store.root,
+                    articles_root=store.memory,
                     top_k=20,
                 )
             )
@@ -248,13 +265,14 @@ async def article_view(request: Request, slug: str) -> HTMLResponse:
         article = store.find_article_by_slug(slug)
         if article:
             pinned = slug in store.pinned_slugs()
+            file_path = _article_file_path(store.root, article.front_matter.type, slug)
             return _tr(
                 request,
                 "article.html",
                 {
                     "article": article,
                     "pinned": pinned,
-                    "store_root": str(store.root),
+                    "file_path": file_path,
                     "page": "knowledge",
                 },
             )

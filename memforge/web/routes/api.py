@@ -142,6 +142,27 @@ async def commit_draft(draft_id: str) -> HTMLResponse:
 
 
 # ---------------------------------------------------------------------------
+# PUT /api/draft/<draft_id>  — Update draft body in-place
+# ---------------------------------------------------------------------------
+
+
+@router.put("/draft/{draft_id}", response_class=HTMLResponse)
+async def update_draft(draft_id: str, content: str = Form(...)) -> HTMLResponse:
+    store, draft = _find_store_for_draft(draft_id)
+    if not store or not draft:
+        raise HTTPException(status_code=404, detail="Draft not found")
+
+    import frontmatter as fm_mod
+
+    path = store.inbox / f"draft-{draft_id}.md"
+    post = fm_mod.load(str(path))
+    post.content = content
+    path.write_text(fm_mod.dumps(post), encoding="utf-8")
+
+    return HTMLResponse('<span class="text-green-600 text-xs">✓ Saved</span>')
+
+
+# ---------------------------------------------------------------------------
 # POST /api/discard/<draft_id>
 # ---------------------------------------------------------------------------
 
