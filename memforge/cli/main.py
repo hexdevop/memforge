@@ -437,7 +437,7 @@ def recall(
         results = retrieve(
             query=query,
             index_path=store.index_file,
-            articles_root=store.root,
+            articles_root=store.memory,
             top_k=top,
             max_snippet_chars=cfg.retriever.max_snippet_chars,
             record_type=type_filter,
@@ -461,6 +461,105 @@ def recall(
         console.print(f"   slug: {r.slug}  score: {r.score:.2f}")
         if r.snippet:
             console.print(f"   [dim]{r.snippet[:200].replace(chr(10), ' ')}[/]")
+
+
+# ---------------------------------------------------------------------------
+# mem context
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def context(
+    query: Annotated[str | None, typer.Argument(help="Optional search query")] = None,
+    top: Annotated[int, typer.Option("--top", "-n", help="Max search results to include")] = 5,
+    no_pinned: Annotated[bool, typer.Option("--no-pinned", help="Skip pinned articles")] = False,
+    no_index: Annotated[bool, typer.Option("--no-index", help="Skip knowledge index")] = False,
+    full: Annotated[
+        bool, typer.Option("--full", help="Include full article bodies, not just snippets")
+    ] = False,
+    scope: Annotated[str, typer.Option("--scope")] = "both",
+) -> None:
+    """Dump knowledge into stdout for LLM context injection.
+
+    In Claude Code run:  ! mem context
+    With search query:   ! mem context "authentication flow"
+    Full articles:       ! mem context "auth" --full
+    """
+    cfg = _load_cfg(scope)
+    stores = _get_stores(scope)
+
+    if not stores:
+        print("<!-- MemForge: No store found. Run: mem init -->")
+        raise typer.Exit(1)
+
+    parts: list[str] = []
+    parts.append("<!-- MemForge Knowledge Context -->")
+
+    # ── Pinned articles ──────────────────────────────────────────────────────
+    if not no_pinned:
+        pinned_sections: list[str] = []
+        seen_pinned: set[str] = set()
+        for store in stores:
+            for slug in store.pinned_slugs():
+                if slug in seen_pinned:
+                    continue
+                seen_pinned.add(slug)
+                article = store.find_article_by_slug(slug)
+                if article:
+                    pinned_sections.append(
+                        f"### {article.front_matter.title}"
+                        f" ({article.front_matter.type})\n\n{article.body.strip()}"
+                    )
+        if pinned_sections:
+            parts.append("## Pinned Knowledge\n\n" + "\n\n---\n\n".join(pinned_sections))
+
+    # ── Knowledge index ──────────────────────────────────────────────────────
+    if not no_index:
+        for store in stores:
+            if store.index_file.exists():
+                index_text = store.index_file.read_text("utf-8").strip()
+                if index_text:
+                    parts.append(f"## Knowledge Index\n\n{index_text}")
+                break
+
+    # ── Search results ───────────────────────────────────────────────────────
+    if query:
+        result_sections: list[str] = []
+        seen_slugs: set[str] = set()
+        for store in stores:
+            results = retrieve(
+                query=query,
+                index_path=store.index_file,
+                articles_root=store.memory,
+                top_k=top,
+                max_snippet_chars=cfg.retriever.max_snippet_chars,
+            )
+            for r in results:
+                if r.slug in seen_slugs:
+                    continue
+                seen_slugs.add(r.slug)
+                if full:
+                    article = store.find_article_by_slug(r.slug)
+                    body = article.body.strip() if article else r.snippet
+                else:
+                    body = r.snippet
+                if body:
+                    result_sections.append(f"### {r.title} ({r.record_type})\n\n{body}")
+                else:
+                    result_sections.append(f"### {r.title} ({r.record_type})")
+        if result_sections:
+            parts.append(f'## Search Results: "{query}"\n\n' + "\n\n---\n\n".join(result_sections))
+        elif not any(p.startswith("## ") for p in parts):
+            parts.append(f'<!-- No results found for: "{query}" -->')
+
+    # ── Nothing to show ──────────────────────────────────────────────────────
+    if len(parts) == 1:
+        parts.append(
+            "<!-- MemForge: Knowledge base is empty."
+            " Run: mem scan && mem commit --all && mem compile -->"
+        )
+
+    print("\n\n".join(parts))
 
 
 # ---------------------------------------------------------------------------

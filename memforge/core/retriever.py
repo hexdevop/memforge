@@ -72,6 +72,20 @@ def retrieve(
     return [r for r in results if r.slug]
 
 
+_TYPE_DIR: dict[str, str] = {
+    "decision": "decisions",
+    "pattern": "concepts",
+    "gotcha": "gotchas",
+    "contract": "contracts",
+    "glossary": "glossary",
+    "todo": "todo-knowledge",
+}
+
+
+def _type_to_dir(record_type: str) -> str:
+    return _TYPE_DIR.get(record_type, f"{record_type}s")
+
+
 def _parse_index(text: str) -> list[dict]:  # type: ignore[type-arg]
     """Parse entries like: - slug (type, confidence) — Title [tags: a, b]"""
     entries: list[dict] = []  # type: ignore[type-arg]
@@ -91,13 +105,14 @@ def _parse_index(text: str) -> list[dict]:  # type: ignore[type-arg]
         if m:
             tags_str = m.group("tags") or ""
             tags = [t.strip() for t in tags_str.split(",") if t.strip()]
+            record_type = m.group("type")
             entry = {
                 "slug": m.group("slug"),
-                "type": m.group("type"),
+                "type": record_type,
                 "confidence": m.group("confidence"),
                 "title": m.group("title").strip(),
                 "tags": tags,
-                "path": f"knowledge/{m.group('type')}s/{m.group('slug')}.md",
+                "path": f"knowledge/{_type_to_dir(record_type)}/{m.group('slug')}.md",
             }
             entries.append(entry)
     return entries
@@ -111,19 +126,18 @@ def _get_snippet(path: Path | None, query: str, max_chars: int) -> str:
     if not path or not path.exists():
         return ""
     text = path.read_text("utf-8", errors="replace")
-    # Find query term location
+    # Strip YAML front-matter before searching
+    if text.startswith("---"):
+        end = text.find("---", 3)
+        if end != -1:
+            text = text[end + 3 :].lstrip()
     query_lower = query.lower()
     text_lower = text.lower()
     pos = text_lower.find(query_lower.split()[0] if query_lower.split() else "")
     if pos == -1:
-        # Return beginning of body (skip front-matter)
-        body_start = text.find("---", 3)
-        if body_start != -1:
-            text = text[body_start + 3 :].lstrip()
         return text[:max_chars].strip()
     start = max(0, pos - 100)
-    snippet = text[start : start + max_chars]
-    return snippet.strip()
+    return text[start : start + max_chars].strip()
 
 
 def _substring_fallback(

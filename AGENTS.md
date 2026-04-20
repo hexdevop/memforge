@@ -4,12 +4,39 @@ This file describes the internal architecture of MemForge for agents and contrib
 
 ---
 
+## Agent support status
+
+| Agent | `mem save` source | Status |
+|---|---|---|
+| **Claude Code** | `claude` | **Fully supported and verified** |
+| Cursor | `cursor` | Not yet verified — may work, treat as experimental |
+| ChatGPT (export) | `chatgpt` | Not yet verified — may work, treat as experimental |
+| Any (stdin/file) | `stdin` / `file` | **Verified** |
+
+---
+
+## Loading memory into Claude Code
+
+The primary way to inject MemForge knowledge into a Claude Code session is the `mem context` command. Run it with `!` so the output lands directly in the conversation:
+
+```
+! mem context                          # pinned articles + knowledge index
+! mem context "authentication"         # BM25 search + snippets
+! mem context "auth" --full            # BM25 search + full article bodies
+! mem context --no-index               # pinned only
+! mem context --no-pinned              # index only
+```
+
+**Why `!`?** In Claude Code, prefixing a shell command with `!` runs it in the current session and injects the stdout into the conversation context. `mem context` outputs clean markdown (no ANSI codes) designed to be read directly by the model.
+
+---
+
 ## Repository layout
 
 ```
 memforge/
 ├── cli/
-│   └── main.py              # All 19 Typer commands. Entry point: mem
+│   └── main.py              # All CLI commands (Typer). Entry point: mem
 ├── config.py                # Pydantic config models, load_config(), save_config()
 ├── core/
 │   ├── models.py            # Transcript, ExtractedUnit, Article, Draft, IndexEntry
@@ -25,8 +52,8 @@ memforge/
 │   └── regex.py             # scrub(): regex pass + optional detect-secrets pass
 ├── sources/
 │   ├── claude_code.py       # ClaudeCodeSource: reads ~/.claude/projects/*/session.jsonl
-│   ├── cursor.py            # CursorSource: reads state.vscdb SQLite
-│   ├── codex.py             # CodexSource: reads ChatGPT conversations.json export
+│   ├── cursor.py            # CursorSource: reads state.vscdb SQLite (unverified)
+│   ├── codex.py             # CodexSource: reads ChatGPT conversations.json (unverified)
 │   └── stdin.py             # StdinSource, FileSource
 ├── exporters/
 │   └── obsidian.py          # export_to_obsidian(): writes Obsidian-compatible vault
@@ -118,6 +145,23 @@ Compiler.compile(store, since, dry_run) → (created, updated)
 
 ---
 
+## Context command (`cli/main.py → context()`)
+
+```
+mem context [QUERY] [--top N] [--full] [--no-pinned] [--no-index] [--scope SCOPE]
+
+Output sections (in order):
+  1. <!-- MemForge Knowledge Context -->   ← always
+  2. ## Pinned Knowledge                  ← full body of each pinned article
+  3. ## Knowledge Index                   ← contents of knowledge/index.md
+  4. ## Search Results: "QUERY"           ← BM25 results (snippets or --full bodies)
+
+Output is plain stdout with no ANSI codes — pipe-safe and LLM-readable.
+In Claude Code: prefix with ! to inject into the conversation.
+```
+
+---
+
 ## Retrieval (`core/retriever.py`)
 
 ```
@@ -151,6 +195,7 @@ retrieve(query, index_path, articles_root, top_k) → list[SearchResult]
        def by_id(self, session_id: str) -> Transcript: ...
    ```
 3. Import and probe in `cli/main.py → _load_transcript()` under `source in ("auto", "my-source")`.
+4. Update the agent support table in this file and in README.md.
 
 ---
 

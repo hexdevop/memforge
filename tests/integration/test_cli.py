@@ -65,6 +65,7 @@ def test_save_dry_run_reports_created_drafts(tmp_path: Path, monkeypatch):
             transcript_hash=transcript.hash,
             quarantined=0,
             backend_used="api",
+            units_extracted=1,
         )
 
     monkeypatch.setattr("memforge.cli.main._load_transcript", lambda *a, **k: transcript)

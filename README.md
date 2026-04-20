@@ -3,9 +3,21 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
-**Local external memory for LLM agents.** Turns transcripts from Claude Code, Cursor, ChatGPT and other AI agents into a structured, versioned, human-readable knowledge base in plain markdown.
+**Local external memory for LLM agents.** Turns your AI coding sessions into a structured, versioned, human-readable knowledge base in plain markdown.
 
 > **Philosophy:** no hidden magic, no auto-saves, no timers. Every change to your knowledge base is the result of an explicit command you ran. Human-in-the-loop at every step.
+
+---
+
+## Agent support
+
+| Agent | Status |
+|---|---|
+| **Claude Code** | Fully supported and verified |
+| Cursor | Not yet verified — may work, treat as experimental |
+| ChatGPT (export) | Not yet verified — may work, treat as experimental |
+
+All other agents and sources are currently unverified. Contributions and test reports are welcome.
 
 ---
 
@@ -26,9 +38,14 @@ mem commit --all               # promote drafts → daily log + git commit
 # Weekly: merge daily logs into permanent knowledge
 mem compile
 
-# Search your knowledge base
+# Load your knowledge into Claude's context (run inside Claude Code with !)
+! mem context                            # pinned articles + full index
+! mem context "authentication flow"     # search + relevant snippets
+! mem context "auth" --full             # search + full article bodies
+
+# Search and inspect from terminal
 mem recall "how did we handle rate limiting"
-mem load rate-limiting-pattern # print article to stdout
+mem load rate-limiting-pattern          # print article to stdout
 
 # Launch the web UI
 mem ui --open
@@ -38,11 +55,16 @@ mem ui --open
 
 ## Installation
 
-**Requirements:** Python 3.11+, an Anthropic API key.
+**Requirements:** Python 3.11+
 
 ```bash
 pip install memforge
+
+# Option A: API key (paid, any Claude model)
 export ANTHROPIC_API_KEY=sk-ant-...
+
+# Option B: Claude Code CLI subscription (free if you have Claude Code)
+# Just make sure `claude` is in your PATH — MemForge detects it automatically
 
 mem init --global              # creates ~/.memforge/ with git repo
 mem init                       # creates .memforge/ in current project (optional)
@@ -54,7 +76,7 @@ mem doctor                     # verify everything is set up correctly
 ## The knowledge flow
 
 ```
-Claude Code / Cursor / ChatGPT
+Claude Code session
         ↓  mem save
     inbox/draft-<uuid>.md       ← preview, edit, or discard
         ↓  mem commit
@@ -63,11 +85,34 @@ Claude Code / Cursor / ChatGPT
     knowledge/<type>/<slug>.md  ← git commit
         ↓
     index.md                    ← BM25 retrieval
-        ↓  mem recall / mem load
+        ↓  mem context / mem recall / mem load
     LLM context
 ```
 
 All files are plain markdown with YAML front-matter. No database, no binary formats, no cloud.
+
+---
+
+## Loading memory into Claude
+
+The key command is `mem context`. Run it with `!` inside Claude Code to inject knowledge directly into the conversation:
+
+```
+# In Claude Code chat:
+! mem context                          # everything: pinned + index
+! mem context "rate limiting"          # targeted: search + snippets
+! mem context "rate limiting" --full   # targeted: search + full bodies
+! mem context --no-index               # pinned articles only
+```
+
+The output is clean markdown — no ANSI codes — ready to be read by the model.
+
+You can also pin the most important articles so they always appear first:
+
+```bash
+mem pin my-architecture-decision
+mem pin api-contract-v2
+```
 
 ---
 
@@ -83,8 +128,14 @@ All files are plain markdown with YAML front-matter. No database, no binary form
 | `mem commit [DRAFT_ID…] [--all] [-m MESSAGE]` | Promote drafts from inbox → `daily/YYYY-MM-DD.md`. Makes a git commit. |
 | `mem discard <DRAFT_ID>` | Delete a draft without saving. |
 | `mem compile [--since DATE] [--dry-run]` | Merge daily logs → `knowledge/`. Rebuilds `index.md`. Makes a git commit. |
-| `mem recall "<query>" [--top N] [--type TYPE]` | BM25 search over `index.md`. Returns top-N results with snippets. |
-| `mem load <slug>` | Print an article to stdout (pipe into your LLM context). |
+
+### Context injection
+
+| Command | Description |
+|---|---|
+| `mem context [QUERY] [--top N] [--full] [--no-pinned] [--no-index]` | **Dump knowledge to stdout for LLM context.** Run with `!` in Claude Code. |
+| `mem recall "<query>" [--top N] [--type TYPE]` | BM25 search — shows titles and snippets in the terminal. |
+| `mem load <slug>` | Print a single article to stdout. |
 
 ### Knowledge management
 
@@ -103,7 +154,7 @@ All files are plain markdown with YAML front-matter. No database, no binary form
 |---|---|
 | `mem stats [--days N]` | Terminal dashboard: article counts, drift, LLM cost summary. |
 | `mem lint` | Check integrity: unparseable files, empty bodies. |
-| `mem doctor` | Check API key, git, dependencies. |
+| `mem doctor` | Check API key / CLI, git, dependencies. |
 | `mem ui [--port 7777] [--open] [--token TOKEN]` | Launch local web UI. |
 
 ---
@@ -112,12 +163,12 @@ All files are plain markdown with YAML front-matter. No database, no binary form
 
 `mem save --source auto` tries sources in order: Claude Code → Cursor → ChatGPT → stdin.
 
-| Source | What it reads |
-|---|---|
-| `claude` | `~/.claude/projects/<hash>/*.jsonl` — latest Claude Code session |
-| `cursor` | `%APPDATA%/Cursor/User/workspaceStorage/*/state.vscdb` — Cursor chat SQLite |
-| `chatgpt` | `~/Downloads/conversations.json` — ChatGPT export |
-| `stdin` | Pipe or `--file PATH` — any markdown/plain text |
+| Source | What it reads | Status |
+|---|---|---|
+| `claude` | `~/.claude/projects/<hash>/*.jsonl` — latest Claude Code session | **Verified** |
+| `cursor` | `%APPDATA%/Cursor/User/workspaceStorage/*/state.vscdb` — Cursor chat SQLite | Not yet verified |
+| `chatgpt` | `~/Downloads/conversations.json` — ChatGPT export | Not yet verified |
+| `stdin` | Pipe or `--file PATH` — any markdown/plain text | **Verified** |
 
 ---
 
@@ -168,6 +219,7 @@ All files are plain markdown with YAML front-matter. No database, no binary form
 ```yaml
 extractor:
   model: claude-sonnet-4-6     # model used for extraction + compilation
+  backend: auto                # auto | api | cli
   language: en                 # language for extracted text (en, ru, …)
   max_units_per_save: 10
 
@@ -217,7 +269,6 @@ cd mem_forge
 pip install -e ".[dev]"
 pytest                         # 57 tests
 ruff check .
-mypy memforge/core/
 ```
 
 ---
